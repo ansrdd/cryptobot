@@ -9,7 +9,10 @@ account:
 
 universe:
   symbols: ["BTC/USD", "ETH/USD"]
-  timeframe: "1h"             # 1h bars — the whole system is tuned for hourly
+  timeframe: "1d"             # strategy decides on DAILY candles (built from hourly data).
+                              # The bot still runs hourly: it checks stops every hour, but
+                              # only considers new entries once per completed daily candle.
+                              # v1 traded hourly bars and lost to fees — see CHANGELOG in README.
 
 data:
   # Where historical bars come from for backtests and warm-up.
@@ -19,15 +22,16 @@ data:
   history_start: "2019-01-01" # how far back to backtest. Earlier crypto is a different market.
 
 strategies:
+  # v2 settings — textbook values chosen BEFORE backtesting, not tuned to the data.
   trend:
     enabled: true
-    fast_ema: 20
-    slow_ema: 60
-    donchian_lookback: 48     # breakout confirmation: price must clear N-bar high
-    atr_period: 14
-    atr_stop_mult: 3.0        # trailing stop = 3 ATR below highest close since entry
+    fast_ema: 20              # days
+    slow_ema: 100             # days — "in an uptrend" = 20d EMA above 100d EMA
+    donchian_lookback: 20     # buy on a close above the prior 20-day high
+    atr_period: 20
+    atr_stop_mult: 3.0        # trailing stop = 3 × average daily range below the highest close
   meanrev:
-    enabled: true
+    enabled: false            # v1 result: no edge even with zero fees. Off.
     zscore_lookback: 48
     entry_z: -2.0             # buy when price is 2 std below its 48h mean...
     exit_z: 0.0               # ...sell when it reverts to the mean
@@ -37,7 +41,7 @@ strategies:
     max_hold_bars: 72         # time stop: bail after 3 days if it hasn't reverted
 
 regime:
-  enabled: true
+  enabled: false              # only one strategy now, nothing to split capital between
   adx_period: 14
   trending_above: 25          # ADX > 25 → trending regime
   # capital split per regime (fractions of total risk budget)
@@ -46,12 +50,12 @@ regime:
     ranging:   { trend: 0.25, meanrev: 0.75 }
 
 risk:
-  risk_per_trade_pct: 0.75    # % of equity risked per trade (distance to stop × size)
-  max_position_pct: 25        # no single position > 25% of equity
+  risk_per_trade_pct: 1.0     # % of equity lost if a trade hits its initial stop
+  max_position_pct: 30        # no single position > 30% of equity
   max_gross_exposure_pct: 60  # all positions combined ≤ 60% of equity (crypto is correlated)
   max_concurrent_positions: 4
   daily_loss_limit_pct: 3.0   # lose 3% in a day → flatten, sleep until next UTC day
-  max_drawdown_kill_pct: 15   # 15% off equity peak → bot disables itself, alerts you
+  max_drawdown_kill_pct: 20   # 20% off equity peak → bot disables itself, alerts you
   loss_streak_halve_after: 3  # 3 consecutive losers → half size for next N trades
   loss_streak_halve_for: 5
 
@@ -69,12 +73,12 @@ execution:
 backtest:
   walk_forward:
     train_months: 12
-    test_months: 3
+    test_months: 6              # daily bars trade less, so score in 6-month windows
   benchmark: "BTC/USD"        # buy-and-hold comparison
 
 alerts:
   telegram: true              # needs TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID secrets
-  events: ["kill_switch", "daily_limit", "order_rejected", "run_failed", "stale_data", "weekly_report"]
+  events: ["trade", "kill_switch", "daily_limit", "order_rejected", "run_failed", "stale_data", "weekly_report"]
 
 dashboard:
   output: "docs/index.html"   # GitHub Pages serves /docs
