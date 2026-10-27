@@ -23,8 +23,8 @@ log = logging.getLogger(__name__)
 BINANCE_URL = "https://api.binance.com/api/v3/klines"
 BINANCE_MAX = 1000  # bars per request
 
-TF_TO_BINANCE = {"1h": "1h", "4h": "4h", "1d": "1d"}
-TF_TO_TIMEDELTA = {"1h": timedelta(hours=1), "4h": timedelta(hours=4), "1d": timedelta(days=1)}
+TF_TO_BINANCE = {"5m": "5m", "1h": "1h", "4h": "4h", "1d": "1d"}
+TF_TO_TIMEDELTA = {"5m": timedelta(minutes=5), "1h": timedelta(hours=1), "4h": timedelta(hours=4), "1d": timedelta(days=1)}
 
 
 def _binance_symbol(sym: str) -> str:
@@ -72,7 +72,7 @@ def _fetch_binance(sym: str, tf: str, start: datetime, end: datetime | None = No
 
 COINBASE_URL = "https://api.exchange.coinbase.com/products/{product}/candles"
 COINBASE_MAX = 300
-TF_TO_SECONDS = {"1h": 3600, "4h": 14400, "1d": 86400}
+TF_TO_SECONDS = {"5m": 300, "1h": 3600, "4h": 14400, "1d": 86400}
 
 
 def _coinbase_product(sym: str) -> str:

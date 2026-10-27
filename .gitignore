@@ -3,3 +3,7 @@ __pycache__/
 .env
 docs/backtest_synthetic.html
 .bootstrap.tar.gz
+# 5m day trading data is ~400k bars per coin, too big to commit
+data/*_5m.parquet
+.venv/
+docs/daytrade_backtest_synthetic.md
