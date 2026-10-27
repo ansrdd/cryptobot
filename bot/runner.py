@@ -72,9 +72,10 @@ def run_once(dry: bool = False) -> int:
     status, detail = "ok", ""
     try:
         # 1. data
-        bars = data.load_universe(cfg)
-        for s, df in bars.items():
-            if data.is_stale(df, cfg.universe.timeframe):
+        hourly = data.load_hourly(cfg)
+        bars = data.load_universe(cfg, hourly)          # strategy timeframe (daily)
+        for s, df in hourly.items():
+            if data.is_stale(df, "1h"):
                 alerts.send(f"⚠️ Stale data for {s}: last bar {df.index[-1] if len(df) else 'none'}", "stale_data", cfg)
                 status, detail = "stale", f"{s} stale"
         # 2. broker
@@ -94,7 +95,8 @@ def run_once(dry: bool = False) -> int:
         st = _load_state(equity)
         if first_run and not dry:
             alerts.send(f"🤖 <b>CryptoBot is online</b>\nPaper account equity ${equity:,.0f}\n"
-                        f"Trading {', '.join(cfg.universe.symbols)} hourly. You'll hear from me when something matters.",
+                        f"Trading {', '.join(cfg.universe.symbols)} on {cfg.universe.timeframe} bars, checking stops hourly. "
+                        f"You'll hear from me on every trade and whenever something matters.",
                         "info", cfg)
         risk = RiskManager(cfg, equity, RiskState.from_dict(st["risk"]))
         book: dict = st["book"]
@@ -102,7 +104,8 @@ def run_once(dry: bool = False) -> int:
         cost = (cfg.costs.taker_fee_bps + cfg.costs.slippage_bps) / 10_000
 
         # reconcile: Alpaca is truth. Our book attributes units to strategies.
-        for sym in cfg.universe.symbols:
+        # (dry runs have no broker to reconcile against, so the book is trusted as-is)
+        for sym in ([] if dry else cfg.universe.symbols):
             have = bpos.get(sym).qty if sym in bpos else 0.0
             ours = sum(v["units"] for k, v in book.items() if k.startswith(sym + "|"))
             if abs(have - ours) > max(1e-6, 0.001 * max(have, ours)):
@@ -128,6 +131,8 @@ def run_once(dry: bool = False) -> int:
             alerts.send(f"⏸ Daily loss limit hit ({cfg.risk.daily_loss_limit_pct}%). Flat until tomorrow UTC.", "daily_limit", cfg)
             st["halt_alerted_day"] = str(risk.state.day)
 
+        acted: dict = st.setdefault("acted", {})          # key -> strategy bar we last entered/exited on
+        last_checked = pd.Timestamp(st["last_hour_checked"]) if st.get("last_hour_checked") else None
         orders: list[tuple[str, str, str, float, str]] = []  # (sym, strat, side, units, reason)
         gross = sum(v["units"] * bars[k.split("|")[0]]["close"].iloc[-1] for k, v in book.items())
 
@@ -136,7 +141,13 @@ def run_once(dry: bool = False) -> int:
             sym, stname = key.split("|")
             df = bars[sym]
             row = df.iloc[-1]
-            p["bars_held"] = p.get("bars_held", 0) + 1
+            if p.get("entry_bar"):
+                p["bars_held"] = int((df.index > pd.Timestamp(p["entry_bar"])).sum())
+            # stop check on every hourly bar since the last run (not just the daily low),
+            # so a crash mid-day is caught within the hour, like the backtest's intrabar stop
+            h = hourly[sym]
+            recent = h[h.index > last_checked] if last_checked is not None else h.iloc[-1:]
+            hour_low = float(recent["low"].min()) if len(recent) else float(h["low"].iloc[-1])
             stobj = next((s for s in strategies if s.name == stname), None)
             sig = stobj.signals(df).iloc[-1] if stobj else None
             if p.get("trail_mult", 0) > 0 and sig is not None:
@@ -145,7 +156,7 @@ def run_once(dry: bool = False) -> int:
             reason = None
             if risk.must_flatten():
                 reason = "risk_flatten"
-            elif p.get("stop", 0) > 0 and row["low"] <= p["stop"]:
+            elif p.get("stop", 0) > 0 and hour_low <= p["stop"]:
                 reason = "stop"
             elif sig is not None and bool(sig["exit"]):
                 reason = "signal"
@@ -163,6 +174,8 @@ def run_once(dry: bool = False) -> int:
                     key = f"{sym}|{stobj.name}"
                     if key in book:
                         continue
+                    if acted.get(key) == str(df.index[-1]):
+                        continue  # already traded this bar (e.g. stopped out today) — wait for a fresh signal
                     sig = stobj.signals(df).iloc[-1]
                     if not bool(sig["entry"]) or np.isnan(sig["stop"]):
                         con.execute("INSERT INTO decisions VALUES(?,?,?,?,?)", (ts_label, sym, stobj.name, "hold", "no entry signal"))
@@ -178,7 +191,8 @@ def run_once(dry: bool = False) -> int:
                         continue
                     gross += units * px
                     orders.append((sym, stobj.name, "buy", units, "signal"))
-                    book[key] = {"units": units, "entry_price": px, "entry_ts": ts_label, "stop": float(sig["stop"]),
+                    book[key] = {"units": units, "entry_price": px, "entry_ts": ts_label, "entry_bar": str(df.index[-1]),
+                                 "stop": float(sig["stop"]),
                                  "trail_mult": float(sig["trail_mult"]), "high_water": px, "bars_held": 0,
                                  "max_hold": int(sig["max_hold"]) if "max_hold" in sig and not np.isnan(sig["max_hold"]) else None,
                                  "pending": True}
@@ -198,9 +212,13 @@ def run_once(dry: bool = False) -> int:
                     book.pop(key, None)
                 continue
             filled, fpx = res.get("filled_qty", units), res.get("fill_price") or float(bars[sym]["close"].iloc[-1])
+            acted[key] = str(bars[sym].index[-1])
             if side == "buy":
                 book[key].update(units=filled, entry_price=fpx * (1 + cost))  # pessimistic cost mark
                 book[key].pop("pending", None)
+                b = book[key]
+                alerts.send(f"🟢 <b>BUY</b> {sym} ({stname})\n{filled:.5f} @ ${fpx:,.2f} · ${filled*fpx:,.0f}\n"
+                            f"stop ${b['stop']:,.2f} ({100*(b['stop']/fpx-1):+.1f}%)", "trade", cfg)
             else:
                 p = book.pop(key)
                 exit_px = fpx * (1 - cost)
@@ -209,16 +227,21 @@ def run_once(dry: bool = False) -> int:
                             (sym, stname, p["entry_ts"], ts_label, p["entry_price"], exit_px, filled, pnl,
                              100 * (exit_px / p["entry_price"] - 1), filled * (p["entry_price"] + exit_px) * cost, reason, p["bars_held"]))
                 risk.on_trade_closed(pnl)
+                emoji = "✅" if pnl >= 0 else "🔻"
+                alerts.send(f"{emoji} <b>SELL</b> {sym} ({stname}) · {reason}\n{filled:.5f} @ ${fpx:,.2f}\n"
+                            f"P&L {'+' if pnl>=0 else '−'}${abs(pnl):,.0f} ({100*(exit_px/p['entry_price']-1):+.1f}%) "
+                            f"after fees · held {p.get('bars_held',0)} {cfg.universe.timeframe} bars", "trade", cfg)
                 if filled < p["units"] * 0.999:  # partial exit: keep remainder
                     p["units"] -= filled
                     book[key] = p
 
         # 6. equity snapshot + persist
-        bench_px = float(bars[cfg.backtest.benchmark]["close"].iloc[-1]) if cfg.backtest.benchmark in bars else float("nan")
+        bench_px = float(hourly[cfg.backtest.benchmark]["close"].iloc[-1]) if cfg.backtest.benchmark in hourly else float("nan")
         con.execute("INSERT OR REPLACE INTO equity VALUES(?,?,?)", (ts_label, equity, bench_px))
         st["risk"] = risk.state.to_dict()
         st["book"] = book
         st["last_run"] = ts_label
+        st["last_hour_checked"] = str(hourly[cfg.universe.symbols[0]].index[-1])
         _save_state(st)
         con.commit()
 
@@ -229,7 +252,7 @@ def run_once(dry: bool = False) -> int:
                 wk = eqs.equity.iloc[-1] / eqs.equity.iloc[-24 * 7] - 1
                 alerts.send(f"📊 Weekly: {wk*100:+.2f}% · equity ${equity:,.0f} · {len(book)} open", "weekly_report", cfg)
 
-        write_dashboard(cfg, con, st, bars, broker, status)
+        write_dashboard(cfg, con, st, hourly, broker, status)
         return 0
     except Exception as e:  # noqa: BLE001
         log.exception("run failed")

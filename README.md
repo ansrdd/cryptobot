@@ -1,11 +1,11 @@
 # CryptoBot — paper-trading research bot
 
-A long-only, hourly crypto bot built to answer one question honestly: **does this method make money over time, after costs, with drawdowns a human could live through?**
+A long-only daily trend-following crypto bot (checks stops hourly) built to answer one question honestly: **does this method make money over time, after costs, with drawdowns a human could live through?**
 
 It paper-trades on Alpaca, runs itself every hour on GitHub Actions for $0, and publishes a P&L dashboard to GitHub Pages. No real money is involved anywhere, and live mode is deliberately not implemented.
 
 ```
-Data (Binance hourly) → Signals (trend + mean-reversion) → Regime weighting (ADX)
+Data (Coinbase hourly → daily candles) → Signal (daily trend-following)
         → Risk layer (vol-targeted sizing, stops, circuit breakers) → Alpaca paper → Dashboard
 ```
 
@@ -62,7 +62,7 @@ In the repo: **Settings → Secrets and variables → Actions → New repository
 
 ## First run
 
-1. **Actions tab → "Backtest (manual)" → Run workflow.** Takes ~5 min the first time (downloads 2019→now hourly history). When it finishes, click the run and read the summary. The full report is at `docs/backtest.html` in the repo — open it, or view it on your Pages URL once that's live.
+1. **Actions tab → "Backtest (manual)" → Run workflow.** Takes ~5 min the first time (downloads 2019→now hourly history and builds daily candles from it). When it finishes, click the run and read the summary. The full report is at `docs/backtest.html` in the repo — open it, or view it on your Pages URL once that's live.
 2. **Actions tab → "Paper trade (hourly)" → Run workflow** to kick off the first real cycle. After that it runs itself at :04 past every hour.
 3. Your dashboard lives at **`https://YOUR_USERNAME.github.io/cryptobot/`**. Bookmark it. Backtest is at `/backtest.html` on the same site.
 
@@ -90,9 +90,21 @@ Nothing. Check the dashboard when you want. You'll get a Telegram message only w
 
 ---
 
+## Strategy history
+
+All results: real Coinbase data, 2019→2026, after 0.25% fees + 0.05% slippage per side.
+
+**v1: hourly trend + mean-reversion (retired).** −64% (kill switch off), Sharpe −2.2, 1,861 trades, lost money in 24 of 27 quarters. With costs set to zero it made +12%, so fees caused most of the loss, but even a zero-cost edge was only ~1.5%/yr. Mean-reversion had no edge at all (−1% at zero cost).
+
+**v2: daily trend-following (current).** Settings committed *before* testing (commit `ac0ba83`): EMA 20/100, 20-day breakout, 3×ATR(20) trailing stop, 1% risk/trade. Result: **+5.8%, Sharpe 0.21, profit factor 1.23, max drawdown −7%, 74 trades.** The pre-set bar was Sharpe ≥ 0.5 and profit factor ≥ 1.3, so **v2 fails it**. It's paper trading anyway, as a learning exercise, not because it passed. Don't tune parameters until it clears the bar; that's how backtests start lying.
+
 ## Judging it
 
-Set the bar before you look, so you don't move it after. Suggested, after **90 days** of paper:
+Set the bar before you look, so you don't move it after.
+
+**Sample size warning:** v2 trades ~10 times a year. 90 days of paper is ~2–3 trades, which says almost nothing about profitability. Paper trading v2 mainly proves the execution works (orders fill, stops fire, alerts arrive). Judge the *strategy* on the backtest and on a year+ of paper, not on a few months.
+
+Suggested bar after **12 months** of paper:
 
 | Metric | Bar |
 |---|---|
@@ -102,7 +114,7 @@ Set the bar before you look, so you don't move it after. Suggested, after **90 d
 | vs buy-and-hold | ahead on a risk-adjusted basis (Calmar) |
 | Walk-forward | beats B&H in most OOS windows, not just the good ones |
 
-If it clears those, you've got something worth thinking about. If not, you learned that for free. **Anything under 30 days is noise. Don't read into week 2.**
+If it clears those, you've got something worth thinking about. If not, you learned that for free. **A handful of trades is noise. Don't read into the first one.**
 
 Things that will fool you: a huge BTC rally (buy-and-hold will crush any risk-managed bot in a straight-up market — that's expected, look at drawdown instead), a single lucky trade, and Alpaca's perfect fills (we haircut them, but still).
 
@@ -127,10 +139,10 @@ python -m pytest -q tests            # tests
 ## Design notes (why it's built this way)
 
 - **Risk layer has veto power.** Vol-targeted sizing (fixed % of equity at risk per trade), hard stops on every position, daily loss limit, max-drawdown kill switch, exposure caps, half-size after a losing streak. Drawdown kills bots, not direction.
-- **Two uncorrelated strategies + regime switch.** Trend-following and mean-reversion win in opposite conditions. ADX decides the capital split. Smoother than either alone.
+- **One strategy, slow timeframe.** Daily trend-following only — see Strategy history for why v1's hourly trend + mean-reversion combo was cut.
 - **Few parameters, no optimizer.** Deliberately. Every knob is a chance to overfit. Walk-forward shows consistency across windows instead of a single flattering number.
 - **Pessimistic costs.** 25 bps fee + 5 bps slippage per side, applied even on paper.
 - **Stateless runner.** Alpaca is the source of truth for positions. Every run reconciles. A skipped or doubled cron does nothing bad.
-- **Long only, hourly only, paper only.** Each of those removes a whole class of ways to lose money while learning nothing. Revisit after it's proven.
+- **Long only, daily signals, paper only.** Each of those removes a whole class of ways to lose money while learning nothing. Revisit after it's proven.
 
 Not financial advice. Paper trading. Build understanding, not expectations.

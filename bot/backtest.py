@@ -215,8 +215,17 @@ def run(cfg, data: dict[str, pd.DataFrame], start: str | None = None, end: str |
 
 
 # ---------------------------------------------------------------- metrics
-def metrics(res: Result, bars_per_year: int = 24 * 365) -> dict:
+def _bar_hours(idx: pd.DatetimeIndex) -> float:
+    """Median spacing of the series in hours (1 for hourly, 24 for daily)."""
+    if len(idx) < 3:
+        return 1.0
+    return float(pd.Series(idx).diff().dropna().median() / pd.Timedelta(hours=1))
+
+
+def metrics(res: Result, bars_per_year: float | None = None) -> dict:
     eq = res.equity
+    bar_h = _bar_hours(eq.index)
+    bars_per_year = bars_per_year or 24 * 365 / bar_h
     ret = eq.pct_change().dropna()
     total = eq.iloc[-1] / eq.iloc[0] - 1
     years = len(eq) / bars_per_year
@@ -249,7 +258,7 @@ def metrics(res: Result, bars_per_year: int = 24 * 365) -> dict:
         "win_rate_pct": 100 * len(wins) / len(tdf) if len(tdf) else float("nan"),
         "avg_win": wins.pnl.mean() if len(wins) else 0.0,
         "avg_loss": losses.pnl.mean() if len(losses) else 0.0,
-        "longest_underwater_days": longest / 24,
+        "longest_underwater_days": longest * bar_h / 24,
         "benchmark_return_pct": 100 * bench_total,
         "benchmark_max_dd_pct": 100 * bdd,
         "bars": int(len(eq)),

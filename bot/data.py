@@ -167,16 +167,33 @@ def update(cache_dir: str | Path, sym: str, tf: str = "1h",
     return df
 
 
-def load_universe(cfg) -> dict[str, pd.DataFrame]:
+def resample(h: pd.DataFrame, tf: str) -> pd.DataFrame:
+    """Hourly → coarser bars (UTC-aligned). Drops the final bucket if it isn't complete yet,
+    so a strategy never acts on a half-formed daily candle."""
+    if tf == "1h" or not len(h):
+        return h
+    rule = {"4h": "4h", "1d": "1D"}[tf]
+    out = h.resample(rule, label="left", closed="left").agg(
+        {"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"}).dropna(subset=["close"])
+    if len(out) and out.index[-1] + TF_TO_TIMEDELTA[tf] > h.index[-1] + TF_TO_TIMEDELTA["1h"]:
+        out = out.iloc[:-1]
+    return out
+
+
+def load_hourly(cfg) -> dict[str, pd.DataFrame]:
+    """Hourly bars — the base series everything is built from (and what live stops check)."""
     import os
     if os.environ.get("CRYPTOBOT_SYNTHETIC"):  # offline testing only
         return {s: synthetic(s, seed=i * 13 + 7, start_price=30000 if "BTC" in s else 2000)
                 for i, s in enumerate(cfg.universe.symbols)}
-    out = {}
-    for sym in cfg.universe.symbols:
-        out[sym] = update(cfg.data.cache_dir, sym, cfg.universe.timeframe,
-                          cfg.data.history_start, cfg.data.source)
-    return out
+    return {sym: update(cfg.data.cache_dir, sym, "1h", cfg.data.history_start, cfg.data.source)
+            for sym in cfg.universe.symbols}
+
+
+def load_universe(cfg, hourly: dict[str, pd.DataFrame] | None = None) -> dict[str, pd.DataFrame]:
+    """Bars at the strategy timeframe (config universe.timeframe), derived from hourly."""
+    hourly = hourly or load_hourly(cfg)
+    return {s: resample(df, cfg.universe.timeframe) for s, df in hourly.items()}
 
 
 def is_stale(df: pd.DataFrame, tf: str, tolerance_bars: int = 3) -> bool:

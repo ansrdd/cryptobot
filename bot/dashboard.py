@@ -320,7 +320,7 @@ footer{{font-size:12px;color:var(--muted);margin:16px 4px}}
   <h2>Trade log <span class="sub">most recent first · {len(trades)} total</span></h2>
   <div class="scroll">{_table(trades, [("exit_ts","Closed","dt"),("symbol","Symbol","text"),("strategy","Strategy","text"),
       ("entry_price","Entry","price"),("exit_price","Exit","price"),("units","Units","num"),("pnl","P&L","money"),
-      ("pnl_pct","%","pct"),("reason","Exit reason","text"),("bars_held","Hours","int")], max_rows=300)}</div>
+      ("pnl_pct","%","pct"),("reason","Exit reason","text"),("bars_held","Bars held","int")], max_rows=300)}</div>
 </section>
 
 {f'<section class="card"><h2>Notes</h2><p class="note" style="font-size:13px;color:var(--text2)">{notes}</p></section>' if notes else ''}

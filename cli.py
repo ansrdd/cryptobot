@@ -23,7 +23,8 @@ from bot.config import ROOT, load  # noqa: E402
 def cmd_backtest(args):
     cfg = load()
     if args.synthetic:
-        bars = {s: data.synthetic(s, seed=i * 13 + 7, start_price=30000 if "BTC" in s else 2000)
+        bars = {s: data.resample(data.synthetic(s, seed=i * 13 + 7, start_price=30000 if "BTC" in s else 2000),
+                                 cfg.universe.timeframe)
                 for i, s in enumerate(cfg.universe.symbols)}
         note = "SYNTHETIC DATA — smoke test only. No conclusions."
     else:
