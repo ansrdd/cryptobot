@@ -12,6 +12,8 @@
   python cli.py breakout1h-backtest --holdout  # the one shot verdict → docs/breakout1h_holdout.md
   python cli.py breakout1h-learn-backtest      # 1h breakout + learning filter DEV check → docs/breakout1h_learn_dev.md
   python cli.py breakout1h-learn-backtest --holdout  # its one shot verdict → docs/breakout1h_learn_holdout.md
+  python cli.py qqq-backtest            # QuantFlow clone on QQQ 5m DEV check → docs/qqq_daytrade_dev.md
+  python cli.py qqq-backtest --holdout  # its one shot verdict → docs/qqq_daytrade_holdout.md
 """
 from __future__ import annotations
 
@@ -185,6 +187,31 @@ def cmd_breakout1h_learn_backtest(args):
     return 0
 
 
+def cmd_qqq_backtest(args):
+    """QuantFlow clone on QQQ 5m (docs/QQQ_DAYTRADE_SPEC.md). Dev by default; holdout once, ever."""
+    from bot import qqq_daytrade, stocks_data
+    cfg = qqq_daytrade.load_config()
+    period = "holdout" if args.holdout else "dev"
+    if args.synthetic:
+        bars = qqq_daytrade.synthetic(days=252 * 8)
+        bars.index = bars.index + (pd.Timestamp("2016-01-04 14:30", tz="UTC") - bars.index[0]).floor("D")
+        note, out = "SYNTHETIC DATA: smoke test only. No conclusions.", ROOT / "docs" / "qqq_daytrade_synthetic.md"
+    else:
+        out = ROOT / "docs" / f"qqq_daytrade_{period}.md"
+        if period == "holdout" and out.exists():
+            print(f"  refusing: the holdout already ran ({out}). It runs ONCE. See the spec.")
+            return 1
+        u = cfg["universe"]
+        bars = stocks_data.load_5m(u["symbols"][0], u["history_start"])
+        note = (f"Alpaca SIP 5m bars, regular hours, split + dividend adjusted (research copy in data/research). "
+                f"SIP history starts {bars.index[0].tz_convert('America/New_York'):%Y-%m-%d}.")
+    text = qqq_daytrade.report(cfg, bars, period, note)
+    print(text)
+    out.write_text(text)
+    print(f"\n  report → {out}")
+    return 0
+
+
 def _has_tabulate() -> bool:
     try:
         import tabulate  # noqa: F401
@@ -251,6 +278,9 @@ def main():
     bl = sub.add_parser("breakout1h-learn-backtest", help="1h breakout + learning filter: dev check, or --holdout once")
     bl.add_argument("--holdout", action="store_true", help="the one shot verdict on 2025+ data")
     bl.add_argument("--synthetic", action="store_true"); bl.set_defaults(fn=cmd_breakout1h_learn_backtest)
+    qq = sub.add_parser("qqq-backtest", help="QuantFlow clone on QQQ 5m: dev check, or --holdout once")
+    qq.add_argument("--holdout", action="store_true", help="the one shot verdict on 2023+ data")
+    qq.add_argument("--synthetic", action="store_true"); qq.set_defaults(fn=cmd_qqq_backtest)
     f = sub.add_parser("fetch"); f.set_defaults(fn=cmd_fetch)
     t = sub.add_parser("telegram", help="find chat id + send test message"); t.set_defaults(fn=cmd_telegram)
     al = sub.add_parser("alpaca", help="verify paper keys"); al.set_defaults(fn=cmd_alpaca)

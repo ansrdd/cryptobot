@@ -191,10 +191,11 @@ def _pf(pnl: pd.Series) -> float:
     return gains / losses
 
 
-def metrics(res: Result, equity0: float) -> dict:
+def metrics(res: Result, equity0: float, periods_per_year: int = 365) -> dict:
+    """periods_per_year: 365 for 24/7 crypto, 252 for stocks (Sharpe from daily returns)."""
     daily = res.equity.resample("1D").last().dropna()
     dret = pd.concat([pd.Series([equity0]), daily.reset_index(drop=True)]).pct_change().dropna()
-    sharpe = dret.mean() / dret.std() * np.sqrt(365) if dret.std() > 0 else float("nan")
+    sharpe = dret.mean() / dret.std() * np.sqrt(periods_per_year) if dret.std() > 0 else float("nan")
     q_end = res.equity.resample("QE").last().dropna()
     q_ret = pd.concat([pd.Series([equity0]), q_end.reset_index(drop=True)]).pct_change().dropna()
     q_ret.index = q_end.index.tz_localize(None).to_period("Q")

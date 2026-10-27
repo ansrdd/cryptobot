@@ -31,10 +31,13 @@ Paper trading crypto bot (BTC/USD, ETH/USD) on Alpaca paper. Live mode is refuse
   - **Dev check (2020 to 2024) FAILED, but close:** -4.4%, Sharpe -0.03, PF 0.98, 388 trades (`docs/breakout1h_learn_dev.md`). AUC 0.559; taken trades won 38.9% vs 31.4% skipped, needed ~39%. Faded in 2024. Maker fees: +35%, PF 1.16.
   - **Holdout NOT run.** Andres's call.
   - Dev 2020 to 2024 for code checks; holdout 2025+ once. Plain breakout 2025+ only shown as a diagnostic after the verdict.
-- **Next: QuantFlow clone on QQQ 5m stocks.** Spec locked BEFORE any data (e995b64): `docs/QQQ_DAYTRADE_SPEC.md`, `config_qqq_daytrade.yaml`.
+- **QuantFlow clone on QQQ 5m stocks.** Spec locked BEFORE any data (e995b64): `docs/QQQ_DAYTRADE_SPEC.md`, `config_qqq_daytrade.yaml`.
   - Fair test of the idea on the index it was built for, with commission free costs (0.02% per side). Regular hours, gap fill ON, long AND short with stop and reverse, flat at the close, no leverage. Dev 2016 to 2022, holdout 2023+ once.
-  - Not built yet. Needs: Alpaca keys in a local `.env` (Andres adds them himself, never in chat), Alpaca SIP 5m data loader (gitignored cache; if only IEX is available, log it in the spec's change log before any test), engine with sessions + shorts + stop and reverse + flat at close, CLI, tests incl. no lookahead.
-- **Local setup:** venv at `.venv` (Python 3.13). System Python is 3.9 with no deps.
+  - Built: `bot/stocks_data.py` (Alpaca SIP 5m via local `.env` keys, market calendar, regular hours only, split + dividend adjusted, drops an unfinished session; cache in gitignored `data/research/`), `bot/qqq_daytrade.py` (long/short, stop and reverse, gap fill, no fills at/after 15:30, flat at the close), `tests/test_qqq_daytrade.py`, `python cli.py qqq-backtest` (`--holdout` runs once, refuses a rerun). `daytrade.metrics` takes `periods_per_year` (252 for stocks).
+  - SIP history starts 2016-01-04 (not 2015), so no warmup before dev; indicators only need days.
+  - **Dev check (2016 to 2022) FAILED hard:** -93%, Sharpe -3.30, PF 0.72, 8,413 trades, 1 of 28 quarters up (`docs/qqq_daytrade_dev.md`). Median 1R is 0.19% of price, so 0.04% round trip is ~1/5 of 1R; avg trade before costs +0.008%. Zero cost +95%, PF 1.07 vs buy and hold +158%. **Holdout NOT run.**
+- **Lesson across all day trading tests:** cost relative to the move kills 5m trading, not fee size. The daily bot is still the best shot; the 1h learner came closest of the faster ones.
+- **Local setup:** venv at `.venv` (Python 3.13). System Python is 3.9 with no deps. Local `.env` (gitignored) holds the Alpaca paper keys for stock data; never print or commit it.
 
 ## Commands
 ```
