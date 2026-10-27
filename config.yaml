@@ -14,7 +14,7 @@ universe:
 data:
   # Where historical bars come from for backtests and warm-up.
   # Downloaded once, then updated incrementally each run.
-  source: "binance"           # binance (free, no key, hourly back to 2017) | alpaca
+  source: "coinbase"          # coinbase (free, no key, US-friendly, BTC hourly back to 2015) | binance (geo-blocks US)
   cache_dir: "data"
   history_start: "2019-01-01" # how far back to backtest. Earlier crypto is a different market.
 

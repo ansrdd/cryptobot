@@ -25,8 +25,9 @@ jobs:
           restore-keys: bars-
       - name: Download history + run backtest
         run: |
-          python cli.py fetch
-          python cli.py backtest | tee backtest_summary.txt
+          set -o pipefail
+          python -u cli.py fetch 2>&1 | tail -20
+          python -u cli.py backtest 2>&1 | tee backtest_summary.txt
       - name: Commit results
         run: |
           git config user.name  "cryptobot"

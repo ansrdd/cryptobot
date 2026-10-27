@@ -70,6 +70,50 @@ def _fetch_binance(sym: str, tf: str, start: datetime, end: datetime | None = No
     return df
 
 
+COINBASE_URL = "https://api.exchange.coinbase.com/products/{product}/candles"
+COINBASE_MAX = 300
+TF_TO_SECONDS = {"1h": 3600, "4h": 14400, "1d": 86400}
+
+
+def _coinbase_product(sym: str) -> str:
+    return sym.replace("/", "-")  # "BTC/USD" -> "BTC-USD"
+
+
+def _fetch_coinbase(sym: str, tf: str, start: datetime, end: datetime | None = None) -> pd.DataFrame:
+    """Coinbase Exchange public candles. Works from US IPs (GitHub runners). 300 bars/request."""
+    end = end or datetime.now(timezone.utc)
+    gran = TF_TO_SECONDS[tf]
+    step = timedelta(seconds=gran * COINBASE_MAX)
+    sess = requests.Session()
+    sess.headers["User-Agent"] = "cryptobot-research/0.1"
+    rows: list[list] = []
+    cur = start
+    while cur < end:
+        chunk_end = min(cur + step, end)
+        params = {"granularity": gran, "start": cur.isoformat(), "end": chunk_end.isoformat()}
+        r = sess.get(COINBASE_URL.format(product=_coinbase_product(sym)), params=params, timeout=30)
+        if r.status_code == 429:
+            log.warning("coinbase rate limit, sleeping")
+            time.sleep(2)
+            continue
+        r.raise_for_status()
+        batch = r.json()
+        if isinstance(batch, list):
+            rows.extend(batch)
+        cur = chunk_end
+        time.sleep(0.12)  # ~8 req/s, under the 10/s public limit
+    if not rows:
+        return _empty()
+    # coinbase: [time, low, high, open, close, volume]
+    df = pd.DataFrame(rows, columns=["ts", "low", "high", "open", "close", "volume"])
+    df["ts"] = pd.to_datetime(df["ts"], unit="s", utc=True)
+    df = df.drop_duplicates("ts").set_index("ts").sort_index().astype(float)
+    return df[["open", "high", "low", "close", "volume"]]
+
+
+FETCHERS = {"coinbase": _fetch_coinbase, "binance": _fetch_binance}
+
+
 def _empty() -> pd.DataFrame:
     return pd.DataFrame(columns=["open", "high", "low", "close", "volume"],
                         index=pd.DatetimeIndex([], tz="UTC", name="ts"))
@@ -96,10 +140,21 @@ def update(cache_dir: str | Path, sym: str, tf: str = "1h",
     start = (df.index[-1] + TF_TO_TIMEDELTA[tf]) if len(df) else pd.Timestamp(history_start, tz="UTC")
     now = datetime.now(timezone.utc)
     if start < now:
-        log.info("fetching %s %s from %s", sym, tf, start)
-        if source != "binance":
-            raise NotImplementedError("only binance history source is wired up")
-        new = _fetch_binance(sym, tf, start.to_pydatetime(), now)
+        log.info("fetching %s %s from %s via %s", sym, tf, start, source)
+        order = [source] + [s for s in FETCHERS if s != source]
+        new, last_err = _empty(), None
+        for src in order:
+            try:
+                new = FETCHERS[src](sym, tf, start.to_pydatetime(), now)
+                if len(new):
+                    if src != source:
+                        log.warning("%s failed, used %s instead", source, src)
+                    break
+            except Exception as e:  # noqa: BLE001 — try the next source
+                last_err = e
+                log.warning("%s fetch failed for %s: %s", src, sym, e)
+        if not len(new) and not len(df):
+            raise RuntimeError(f"no data source worked for {sym}: {last_err}")
         if len(new):
             df = pd.concat([df, new])
             df = df[~df.index.duplicated(keep="last")].sort_index()
