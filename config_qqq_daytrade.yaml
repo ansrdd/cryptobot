@@ -1,0 +1,63 @@
+# ============================================================
+#  QUANTFLOW CLONE ON QQQ 5m (research): the fair test of the idea
+#  Locked BEFORE any QQQ data is downloaded. See docs/QQQ_DAYTRADE_SPEC.md.
+#  Do not edit these numbers to make a backtest look better.
+#  The live daily crypto bot (config.yaml) is untouched by this file.
+# ============================================================
+
+universe:
+  symbols: ["QQQ"]
+  timeframe: "5m"
+  session: { tz: "America/New_York", open: "09:30", close: "16:00" }   # regular hours only
+  data_source: "alpaca"
+  feed: "sip"                  # required; IEX only → stop and log it in the spec
+  history_start: "2015-06-01"  # warm up for SMA 200 etc. before dev starts
+
+periods:
+  dev_start: "2016-01-01"
+  dev_end: "2022-12-31"
+  holdout_start: "2023-01-01"  # the verdict, run ONCE, to the run date
+
+sources:
+  ribbon_flip: { enabled: true, fast_ema: 9, slow_ema: 21 }
+  macd: { enabled: true, fast: 12, slow: 26, signal: 9 }
+  rsi2: { enabled: true, period: 2, buy_below: 10, sell_above: 90, trend_sma: 200 }
+  band_reentry: { enabled: true, period: 20, stdev: 2.0, trend_sma: 200 }
+  gap_fill: { enabled: true, min_gap_pct: 0.25 }   # vs prior session close, first bar only
+
+trade:
+  atr_period: 14
+  stop_atr_mult: 1.5
+  target_r: 2.0
+  breakeven_at_r: 1.0
+  stop_and_reverse: true       # every BUY gets its SELL
+  long_short: true
+  no_entries_after: "15:30"
+  flat_at_close: true          # exit at the close of the last bar of the session
+
+filters:
+  outsized_candle: { enabled: true, range_atr_mult: 3.0, pause_bars: 18 }
+
+risk:
+  risk_per_trade_pct: 1.0
+  max_position_pct: 100        # no leverage
+  daily_loss_limit_pct: 3.0
+  max_drawdown_kill_pct: 20    # recorded only
+
+costs:
+  # no commission; spread + slippage + SEC/FINRA sell fees, per side
+  fee_bps: 0
+  slippage_bps: 2
+  diagnostics:                 # NOT the verdict
+    stress: { fee_bps: 0, slippage_bps: 5 }
+    zero_cost: { fee_bps: 0, slippage_bps: 0 }
+
+passing_bar:                   # holdout only, all must hold, at real costs
+  min_sharpe: 0.5              # daily returns, 252 trading days
+  min_profit_factor: 1.3
+  min_total_return_pct: 0.0
+  min_trades: 100
+  min_pct_quarters_profitable: 60
+
+account:
+  starting_equity: 100000
