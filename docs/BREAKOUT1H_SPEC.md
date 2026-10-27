@@ -55,4 +55,4 @@ Coinbase public 1 hour candles, BTC/USD and ETH/USD (same source as the live bot
 
 ## Change log
 
-- (none yet)
+- 2026-10-27: no setting changes. After the dev check failed, the standalone holdout is **retired, not run**: the next attempt (`docs/BREAKOUT1H_LEARN_SPEC.md`) reuses this signal with a learning trade filter and needs 2025+ to stay unseen. This strategy's 2025+ results will only appear as a diagnostic next to that test's holdout.

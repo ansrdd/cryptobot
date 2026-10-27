@@ -1,0 +1,37 @@
+# ============================================================
+#  1h BREAKOUT + LEARNING TRADE FILTER (research, meta labeling)
+#  Locked BEFORE any backtest. See docs/BREAKOUT1H_LEARN_SPEC.md.
+#  Base signal and trade rules come from config_breakout1h.yaml (unchanged).
+#  Do not edit these numbers to make a backtest look better.
+# ============================================================
+
+base_config: "config_breakout1h.yaml"
+
+label:
+  win_if: "net_pnl_after_real_costs > 0"
+
+features:
+  atr_period: 14
+  atr_avg_bars: 720            # 30 days of 1h bars
+  trend_ema: 200
+  ema_slope_bars: 24
+  breakout_bars: 24
+  volume_avg_bars: 168         # 7 days
+  ret_short_bars: 24
+  ret_long_bars: 168
+  market_symbol: "BTC/USD"     # market trend input for every coin
+
+model:
+  type: "logistic_regression"
+  l2_penalty: 1.0              # on standardized inputs
+  standardize: "train_only"
+  retrain: "monthly"           # first bar of each calendar month, UTC
+  window: "expanding"
+  min_train_samples: 200       # no trades before this
+
+cutoff:
+  rule: "pf_breakeven"         # p_needed = pf*(1+k) / ((target_r - k) + pf*(1+k))
+  target_pf: 1.3
+  # k = round trip cost / 1R for each trade, using the real costs in the base config
+
+# test periods, costs, risk, passing bar: same as base_config
