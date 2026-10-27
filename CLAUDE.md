@@ -10,18 +10,21 @@ Paper trading crypto bot (BTC/USD, ETH/USD) on Alpaca paper. Live mode is refuse
 - The hourly workflow commits to `main` every run, so `git pull --rebase` before pushing.
 - Never commit API keys or tokens. They live in GitHub Secrets and a local `.env` (gitignored).
 
-## Current state (2026-10-27)
+## Current state (2026-10-27, updated after day trade run)
 - **Live daily bot (v2):** daily trend following, checks stops hourly. Backtest +5.8%, Sharpe 0.21, PF 1.23. Failed its bar (Sharpe ≥ 0.5, PF ≥ 1.3) but runs on paper as a learning exercise.
 - **Known issue:** GitHub's scheduler has been skipping most hourly runs (only 1 scheduled run between 07:21 and 17:50 UTC on 2026-10-27). Plan is an always on server later (Google Cloud free e2-micro in us-east1).
-- **In progress: day trading mode.** A free, open clone of the QuantFlow TradingView indicator (thequantflow.com) on 5 minute bars.
-  - Locked spec: `docs/DAYTRADE_SPEC.md`. Locked settings: `config_daytrade.yaml`. Both committed before any backtest.
-  - Not built yet: `bot/quantflow.py` (signals), `bot/daytrade.py` (engine with target, stop, breakeven), 5m Coinbase data (`data.py` needs "5m": 300 sec granularity), a `daytrade-backtest` CLI command, and tests (including a no lookahead test).
-  - Data: Coinbase public candles, 300 per request (step 299), from 2023-01-01. Don't commit 5m parquet files (too big).
-  - Next: build it, backtest once with the locked settings, compare to the passing bar in the spec.
+- **Day trading mode: built, tested once, FAILED (2026-10-27).** A free, open clone of the QuantFlow TradingView indicator (thequantflow.com) on 5 minute bars.
+  - Locked spec `docs/DAYTRADE_SPEC.md` + settings `config_daytrade.yaml` (763ed29), code committed before the run (63bf75d): `bot/quantflow.py` (signals), `bot/daytrade.py` (engine), `tests/test_daytrade.py` (incl. no lookahead tests).
+  - Result (`docs/daytrade_backtest.md`, 6c58988): -99.97%, Sharpe -9.49, PF 0.00, 4,431 trades. Failed 4 of 5 checks.
+  - Cause is fees: median 5m ATR is 0.15% (BTC) / 0.20% (ETH), so a 2R target (~0.45% / ~0.61%) is at or below the 0.60% round trip cost. At zero cost: +42%, PF 1.04, avg trade +0.004%, i.e. no real edge.
+  - **Do not tune this spec.** Any new day trading idea needs its own locked spec and a fresh test period.
+  - Data: Coinbase public 5m candles from 2023-01-01, cached in `data/*_5m.parquet` (gitignored, too big).
+- **Local setup:** venv at `.venv` (Python 3.13). System Python is 3.9 with no deps.
 
 ## Commands
 ```
 python cli.py backtest               # daily bot backtest → docs/backtest.html
 python cli.py backtest --synthetic   # offline smoke test
 python -m pytest -q tests            # tests
+python cli.py daytrade-backtest       # QuantFlow clone on 5m → docs/daytrade_backtest.md (already run once, failed)
 ```
