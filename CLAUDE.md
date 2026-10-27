@@ -31,6 +31,9 @@ Paper trading crypto bot (BTC/USD, ETH/USD) on Alpaca paper. Live mode is refuse
   - **Dev check (2020 to 2024) FAILED, but close:** -4.4%, Sharpe -0.03, PF 0.98, 388 trades (`docs/breakout1h_learn_dev.md`). AUC 0.559; taken trades won 38.9% vs 31.4% skipped, needed ~39%. Faded in 2024. Maker fees: +35%, PF 1.16.
   - **Holdout NOT run.** Andres's call.
   - Dev 2020 to 2024 for code checks; holdout 2025+ once. Plain breakout 2025+ only shown as a diagnostic after the verdict.
+- **Next: QuantFlow clone on QQQ 5m stocks.** Spec locked BEFORE any data (e995b64): `docs/QQQ_DAYTRADE_SPEC.md`, `config_qqq_daytrade.yaml`.
+  - Fair test of the idea on the index it was built for, with commission free costs (0.02% per side). Regular hours, gap fill ON, long AND short with stop and reverse, flat at the close, no leverage. Dev 2016 to 2022, holdout 2023+ once.
+  - Not built yet. Needs: Alpaca keys in a local `.env` (Andres adds them himself, never in chat), Alpaca SIP 5m data loader (gitignored cache; if only IEX is available, log it in the spec's change log before any test), engine with sessions + shorts + stop and reverse + flat at close, CLI, tests incl. no lookahead.
 - **Local setup:** venv at `.venv` (Python 3.13). System Python is 3.9 with no deps.
 
 ## Commands
