@@ -83,7 +83,7 @@ def _fetch_coinbase(sym: str, tf: str, start: datetime, end: datetime | None = N
     """Coinbase Exchange public candles. Works from US IPs (GitHub runners). 300 bars/request."""
     end = end or datetime.now(timezone.utc)
     gran = TF_TO_SECONDS[tf]
-    step = timedelta(seconds=gran * COINBASE_MAX)
+    step = timedelta(seconds=gran * (COINBASE_MAX - 1))  # inclusive ends → stay under 300
     sess = requests.Session()
     sess.headers["User-Agent"] = "cryptobot-research/0.1"
     rows: list[list] = []
@@ -129,7 +129,7 @@ def load_cached(cache_dir: Path, sym: str, tf: str) -> pd.DataFrame:
 
 
 def update(cache_dir: str | Path, sym: str, tf: str = "1h",
-           history_start: str = "2019-01-01", source: str = "binance") -> pd.DataFrame:
+           history_start: str = "2019-01-01", source: str = "coinbase") -> pd.DataFrame:
     """Return full cached history for sym, fetching anything missing first.
 
     Drops the still-forming final bar so strategies never act on a partial candle.

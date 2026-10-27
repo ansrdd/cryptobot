@@ -90,7 +90,12 @@ def run_once(dry: bool = False) -> int:
             bpos = broker.positions()
 
         # 3. state
+        first_run = not STATE_FILE.exists()
         st = _load_state(equity)
+        if first_run and not dry:
+            alerts.send(f"🤖 <b>CryptoBot is online</b>\nPaper account equity ${equity:,.0f}\n"
+                        f"Trading {', '.join(cfg.universe.symbols)} hourly. You'll hear from me when something matters.",
+                        "info", cfg)
         risk = RiskManager(cfg, equity, RiskState.from_dict(st["risk"]))
         book: dict = st["book"]
         strategies = build(cfg)
