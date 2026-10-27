@@ -50,7 +50,7 @@ jobs:
           git config user.email "cryptobot@users.noreply.github.com"
           git add -A state docs
           git diff --cached --quiet || git commit -m "run $(date -u +'%Y-%m-%d %H:%M UTC')"
-          git pull --rebase -X theirs || true
+          git pull --rebase --autostash -X theirs || true   # autostash: the run leaves data/ cache files modified
           git push
 
       - name: Upload Pages artifact
