@@ -1,0 +1,52 @@
+# ============================================================
+#  1h VOLATILITY BREAKOUT (research): "slow day trading"
+#  Locked BEFORE any backtest. See docs/BREAKOUT1H_SPEC.md.
+#  Do not edit these numbers to make a backtest look better.
+#  The live daily bot (config.yaml) is untouched by this file.
+# ============================================================
+
+universe:
+  symbols: ["BTC/USD", "ETH/USD"]
+  timeframe: "1h"
+  history_start: "2019-01-01"     # warm up for indicators
+
+periods:
+  dev_start: "2020-01-01"         # development: check the code works
+  dev_end: "2024-12-31"
+  holdout_start: "2025-01-01"     # the verdict, run ONCE, to the run date
+
+entry:
+  trend_ema: 200                  # close must be above EMA 200
+  breakout_bars: 24               # close > highest high of the previous 24 bars
+
+trade:
+  atr_period: 14
+  stop_atr_mult: 2.0              # stop = 2 x ATR below entry
+  target_r: 3.0                   # target = 3R
+  min_target_cost_mult: 5.0       # skip if 3R target < 5 x round trip cost
+  time_stop_bars: 48              # exit after 2 days in the trade
+  long_only: true                 # Alpaca has no margin for crypto
+
+risk:
+  risk_per_trade_pct: 1.0
+  max_position_pct: 30            # per coin
+  daily_loss_limit_pct: 3.0       # halt new entries for the rest of the UTC day
+  max_drawdown_kill_pct: 20       # recorded only, test keeps running
+
+costs:
+  # Alpaca crypto Tier 1 taker 0.25% + 0.05% slippage, per side (same as everything else)
+  fee_bps: 25
+  slippage_bps: 5
+  diagnostics:                    # NOT the verdict
+    maker_no_slip: { fee_bps: 15, slippage_bps: 0 }
+    zero_cost: { fee_bps: 0, slippage_bps: 0 }
+
+passing_bar:                      # holdout only, all must hold, at real costs
+  min_sharpe: 0.5
+  min_profit_factor: 1.3
+  min_total_return_pct: 0.0
+  min_trades: 100
+  min_pct_quarters_profitable: 60
+
+account:
+  starting_equity: 100000
