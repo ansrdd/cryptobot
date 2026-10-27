@@ -10,7 +10,7 @@ Paper trading crypto bot (BTC/USD, ETH/USD) on Alpaca paper. Live mode is refuse
 - The hourly workflow commits to `main` every run, so `git pull --rebase` before pushing.
 - Never commit API keys or tokens. They live in GitHub Secrets and a local `.env` (gitignored).
 
-## Current state (2026-10-27, updated after day trade run)
+## Current state (2026-10-27, end of day: day trading track closed)
 - **Live daily bot (v2):** daily trend following, checks stops hourly. Backtest +5.8%, Sharpe 0.21, PF 1.23. Failed its bar (Sharpe ≥ 0.5, PF ≥ 1.3) but runs on paper as a learning exercise.
 - **Known issue:** GitHub's scheduler has been skipping most hourly runs (only 1 scheduled run between 07:21 and 17:50 UTC on 2026-10-27). Plan is an always on server later (Google Cloud free e2-micro in us-east1).
 - **Day trading mode: built, tested once, FAILED (2026-10-27).** A free, open clone of the QuantFlow TradingView indicator (thequantflow.com) on 5 minute bars.
@@ -29,14 +29,16 @@ Paper trading crypto bot (BTC/USD, ETH/USD) on Alpaca paper. Live mode is refuse
   - Same base signal and trade rules. L2 logistic regression on 12 inputs known at signal time predicts P(net win); retrain monthly on candidates that already EXITED (expanding window, 200 sample warm up). Take a trade only if P >= the PF 1.3 breakeven for that trade's cost/R.
   - Built: `bot/breakout1h_learn.py` (features, candidates + labels, numpy logistic regression, monthly walk forward), `tests/test_breakout1h_learn.py`, `python cli.py breakout1h-learn-backtest` (`--holdout` runs once, refuses a rerun). `bot/breakout1h.py` got an optional `buy_filter` hook (no change when unused).
   - **Dev check (2020 to 2024) FAILED, but close:** -4.4%, Sharpe -0.03, PF 0.98, 388 trades (`docs/breakout1h_learn_dev.md`). AUC 0.559; taken trades won 38.9% vs 31.4% skipped, needed ~39%. Faded in 2024. Maker fees: +35%, PF 1.16.
-  - **Holdout NOT run.** Andres's call.
+  - **HOLDOUT (2025+, the verdict) FAILED:** -15%, Sharpe -1.55, PF 0.47, 55 trades (`docs/breakout1h_learn_holdout.md`). AUC 0.502: what it learned didn't carry forward. Plain 1h breakout over the same window: -54%. Closed; don't tune.
   - Dev 2020 to 2024 for code checks; holdout 2025+ once. Plain breakout 2025+ only shown as a diagnostic after the verdict.
 - **QuantFlow clone on QQQ 5m stocks.** Spec locked BEFORE any data (e995b64): `docs/QQQ_DAYTRADE_SPEC.md`, `config_qqq_daytrade.yaml`.
   - Fair test of the idea on the index it was built for, with commission free costs (0.02% per side). Regular hours, gap fill ON, long AND short with stop and reverse, flat at the close, no leverage. Dev 2016 to 2022, holdout 2023+ once.
   - Built: `bot/stocks_data.py` (Alpaca SIP 5m via local `.env` keys, market calendar, regular hours only, split + dividend adjusted, drops an unfinished session; cache in gitignored `data/research/`), `bot/qqq_daytrade.py` (long/short, stop and reverse, gap fill, no fills at/after 15:30, flat at the close), `tests/test_qqq_daytrade.py`, `python cli.py qqq-backtest` (`--holdout` runs once, refuses a rerun). `daytrade.metrics` takes `periods_per_year` (252 for stocks).
   - SIP history starts 2016-01-04 (not 2015), so no warmup before dev; indicators only need days.
-  - **Dev check (2016 to 2022) FAILED hard:** -93%, Sharpe -3.30, PF 0.72, 8,413 trades, 1 of 28 quarters up (`docs/qqq_daytrade_dev.md`). Median 1R is 0.19% of price, so 0.04% round trip is ~1/5 of 1R; avg trade before costs +0.008%. Zero cost +95%, PF 1.07 vs buy and hold +158%. **Holdout NOT run.**
-- **Lesson across all day trading tests:** cost relative to the move kills 5m trading, not fee size. The daily bot is still the best shot; the 1h learner came closest of the faster ones.
+  - **Dev check (2016 to 2022) FAILED hard:** -93%, Sharpe -3.30, PF 0.72, 8,413 trades, 1 of 28 quarters up (`docs/qqq_daytrade_dev.md`). Median 1R is 0.19% of price, so 0.04% round trip is ~1/5 of 1R; avg trade before costs +0.008%. Zero cost +95%, PF 1.07 vs buy and hold +158%.
+  - **HOLDOUT (2023+, the verdict) FAILED:** -84%, Sharpe -4.81, PF 0.69, 4,500 trades, 0 of 16 quarters up (`docs/qqq_daytrade_holdout.md`). Zero cost PF 0.99: no edge even for free. Buy and hold +171%. Closed; don't tune.
+- **Day trading track CLOSED (2026-10-27).** Four strategies built and tested with locked specs; none passed (5m crypto, 1h breakout, 1h learner, 5m QQQ). Lesson: cost relative to the move kills short timeframe trading, not fee size, and none of these signals had a real edge out of sample. The daily trend bot is the only strategy running. Any new idea needs its own locked spec and fresh data; the holdouts above are spent.
+- **Next:** always on server (Google Cloud free e2-micro, us-east1) so the daily bot stops missing hourly runs.
 - **Local setup:** venv at `.venv` (Python 3.13). System Python is 3.9 with no deps. Local `.env` (gitignored) holds the Alpaca paper keys for stock data; never print or commit it.
 
 ## Commands
