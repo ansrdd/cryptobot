@@ -10,6 +10,8 @@
   python cli.py daytrade-backtest --synthetic  # same, on fake data (offline smoke test)
   python cli.py breakout1h-backtest            # 1h breakout DEV check → docs/breakout1h_dev.md
   python cli.py breakout1h-backtest --holdout  # the one shot verdict → docs/breakout1h_holdout.md
+  python cli.py breakout1h-learn-backtest      # 1h breakout + learning filter DEV check → docs/breakout1h_learn_dev.md
+  python cli.py breakout1h-learn-backtest --holdout  # its one shot verdict → docs/breakout1h_learn_holdout.md
 """
 from __future__ import annotations
 
@@ -156,6 +158,33 @@ def cmd_breakout1h_backtest(args):
     return 0
 
 
+def cmd_breakout1h_learn_backtest(args):
+    """1h breakout + learning filter (docs/BREAKOUT1H_LEARN_SPEC.md). Dev by default; holdout once, ever."""
+    from bot import breakout1h, breakout1h_learn
+    base, learn = breakout1h_learn.load_config()
+    period = "holdout" if args.holdout else "dev"
+    if args.synthetic:
+        n = 24 * 365 * 7
+        bars = {}
+        for i, s in enumerate(base["universe"]["symbols"]):
+            df = data.synthetic(s, bars=n, seed=i * 13 + 7, start_price=30000 if "BTC" in s else 2000)
+            df.index = pd.date_range(end="2026-10-27", periods=n, freq="1h", tz="UTC")
+            bars[s] = df
+        note, out = "SYNTHETIC DATA: smoke test only. No conclusions.", ROOT / "docs" / "breakout1h_learn_synthetic.md"
+    else:
+        out = ROOT / "docs" / f"breakout1h_learn_{period}.md"
+        if period == "holdout" and out.exists():
+            print(f"  refusing: the holdout already ran ({out}). It runs ONCE. See the spec.")
+            return 1
+        bars = breakout1h.load_bars(base)
+        note = f"Coinbase 1h candles (research copy in {breakout1h.RESEARCH_DIR.relative_to(ROOT)})."
+    text = breakout1h_learn.report(bars, base, learn, period, note)
+    print(text)
+    out.write_text(text)
+    print(f"\n  report → {out}")
+    return 0
+
+
 def _has_tabulate() -> bool:
     try:
         import tabulate  # noqa: F401
@@ -219,6 +248,9 @@ def main():
     bo = sub.add_parser("breakout1h-backtest", help="1h breakout: dev check, or --holdout once")
     bo.add_argument("--holdout", action="store_true", help="the one shot verdict on 2025+ data")
     bo.add_argument("--synthetic", action="store_true"); bo.set_defaults(fn=cmd_breakout1h_backtest)
+    bl = sub.add_parser("breakout1h-learn-backtest", help="1h breakout + learning filter: dev check, or --holdout once")
+    bl.add_argument("--holdout", action="store_true", help="the one shot verdict on 2025+ data")
+    bl.add_argument("--synthetic", action="store_true"); bl.set_defaults(fn=cmd_breakout1h_learn_backtest)
     f = sub.add_parser("fetch"); f.set_defaults(fn=cmd_fetch)
     t = sub.add_parser("telegram", help="find chat id + send test message"); t.set_defaults(fn=cmd_telegram)
     al = sub.add_parser("alpaca", help="verify paper keys"); al.set_defaults(fn=cmd_alpaca)

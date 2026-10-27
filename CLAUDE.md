@@ -25,9 +25,11 @@ Paper trading crypto bot (BTC/USD, ETH/USD) on Alpaca paper. Live mode is refuse
   - **Standalone holdout retired, never run** (logged in its spec's change log) so 2025+ stays unseen for the learner below.
   - Don't write to the tracked `data/*_1h.parquet` files (the live bot commits them); work from a copy.
   - Paper trading only if it passes: same Telegram bot with a "[1h]" tag, separate Alpaca paper account, needs the always on server.
-- **Next: 1h breakout + learning trade filter (meta labeling).** Spec locked BEFORE any backtest (0884293): `docs/BREAKOUT1H_LEARN_SPEC.md`, `config_breakout1h_learn.yaml`.
+- **1h breakout + learning trade filter (meta labeling).** Spec locked BEFORE any backtest (0884293): `docs/BREAKOUT1H_LEARN_SPEC.md`, `config_breakout1h_learn.yaml`.
   - Same base signal and trade rules. L2 logistic regression on 12 inputs known at signal time predicts P(net win); retrain monthly on candidates that already EXITED (expanding window, 200 sample warm up). Take a trade only if P >= the PF 1.3 breakeven for that trade's cost/R.
-  - Not built yet. Needs: feature builder, candidate + label simulation, walk forward retraining, engine hook, CLI, tests incl. no lookahead on features AND labels (labels only after exit).
+  - Built: `bot/breakout1h_learn.py` (features, candidates + labels, numpy logistic regression, monthly walk forward), `tests/test_breakout1h_learn.py`, `python cli.py breakout1h-learn-backtest` (`--holdout` runs once, refuses a rerun). `bot/breakout1h.py` got an optional `buy_filter` hook (no change when unused).
+  - **Dev check (2020 to 2024) FAILED, but close:** -4.4%, Sharpe -0.03, PF 0.98, 388 trades (`docs/breakout1h_learn_dev.md`). AUC 0.559; taken trades won 38.9% vs 31.4% skipped, needed ~39%. Faded in 2024. Maker fees: +35%, PF 1.16.
+  - **Holdout NOT run.** Andres's call.
   - Dev 2020 to 2024 for code checks; holdout 2025+ once. Plain breakout 2025+ only shown as a diagnostic after the verdict.
 - **Local setup:** venv at `.venv` (Python 3.13). System Python is 3.9 with no deps.
 

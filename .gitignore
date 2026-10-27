@@ -9,3 +9,4 @@ data/*_5m.parquet
 docs/daytrade_backtest_synthetic.md
 data/research/
 docs/breakout1h_synthetic.md
+docs/breakout1h_learn_synthetic.md

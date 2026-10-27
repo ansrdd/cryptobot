@@ -61,7 +61,9 @@ def signals(df: pd.DataFrame, cfg: dict) -> pd.DataFrame:
 
 
 def run(cfg: dict, bars: dict[str, pd.DataFrame], start: str | None = None, end: str | None = None,
-        fee_bps: float | None = None, slippage_bps: float | None = None) -> Result:
+        fee_bps: float | None = None, slippage_bps: float | None = None,
+        buy_filter: dict[str, pd.Series] | None = None) -> Result:
+    """buy_filter (optional): per coin bool Series; a buy also needs True there (used by the learning filter)."""
     fee = cfg["costs"]["fee_bps"] if fee_bps is None else fee_bps
     slip = cfg["costs"]["slippage_bps"] if slippage_bps is None else slippage_bps
     cost = (fee + slip) / 10_000
@@ -91,6 +93,9 @@ def run(cfg: dict, bars: dict[str, pd.DataFrame], start: str | None = None, end:
     for s in syms:
         df = bars[s].reindex(full)
         sig = signals(bars[s], cfg).reindex(full)
+        if buy_filter is not None:
+            sig["buy"] = sig["buy"].fillna(False).astype(bool) & \
+                buy_filter.get(s, pd.Series(dtype=bool)).reindex(full).fillna(False).astype(bool)
         mark = df["close"].ffill()
         df, sig, mark = df.reindex(idx), sig.reindex(idx), mark.reindex(idx)
         A[s] = {"o": df["open"].to_numpy(float), "h": df["high"].to_numpy(float),
