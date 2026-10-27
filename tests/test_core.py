@@ -84,3 +84,12 @@ def test_metrics_annualize_by_bar_spacing():
     r = backtest.Result(eq, [], eq.copy())
     m = backtest.metrics(r)
     assert abs(m["cagr_pct"] - 100 * (1.0003 ** 365 - 1)) < 0.5
+
+
+def test_alert_wording():
+    from bot import alerts
+    assert alerts.buy_msg("BTC/USD") == "We're buying BTC rn"
+    assert alerts.sell_msg("ETH/USD", "stop", -50) == "Just sold ETH bc it hit the stop loss"
+    assert alerts.sell_msg("BTC/USD", "signal", 1240.5) == "Just sold BTC bc the trend flipped\nWe just made $1,240.50 bro"
+    assert alerts.sell_msg("BTC/USD", "weird", 0) == "Just sold BTC bc weird"
+    assert alerts.weekly_msg(-0.035, 96500, 0).endswith("Rough week, we're down")

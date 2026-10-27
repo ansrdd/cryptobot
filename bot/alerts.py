@@ -27,3 +27,40 @@ def send(text: str, kind: str = "info", cfg=None) -> bool:
     except Exception as e:  # noqa: BLE001
         log.warning("telegram failed: %s", e)
         return False
+
+
+# ---------------------------------------------------------------- message wording (Andres's words)
+SELL_REASONS = {
+    "stop": "it hit the stop loss",
+    "signal": "the trend flipped",
+    "time_stop": "we held it too long",
+    "risk_flatten": "the risk limits said get out",
+}
+
+
+def _coin(sym: str) -> str:
+    return sym.split("/")[0]  # "BTC/USD" -> "BTC"
+
+
+def buy_msg(sym: str) -> str:
+    return f"We're buying {_coin(sym)} rn"
+
+
+def sell_msg(sym: str, reason: str, pnl: float) -> str:
+    msg = f"Just sold {_coin(sym)} bc {SELL_REASONS.get(reason, reason)}"
+    if pnl > 0:
+        msg += f"\nWe just made ${pnl:,.2f} bro"
+    return msg
+
+
+def weekly_msg(week_ret: float, equity: float, n_open: int) -> str:
+    if week_ret >= 0.02:
+        mood = "Looking good, solid week"
+    elif week_ret >= 0:
+        mood = "Looking good, up a little"
+    elif week_ret > -0.02:
+        mood = "Down a little, nothing crazy"
+    else:
+        mood = "Rough week, we're down"
+    return (f"This week: {week_ret * 100:+.2f}%\nEquity: ${equity:,.0f}\n"
+            f"Open positions: {n_open}\n{mood}")

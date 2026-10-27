@@ -216,9 +216,7 @@ def run_once(dry: bool = False) -> int:
             if side == "buy":
                 book[key].update(units=filled, entry_price=fpx * (1 + cost))  # pessimistic cost mark
                 book[key].pop("pending", None)
-                b = book[key]
-                alerts.send(f"🟢 <b>BUY</b> {sym} ({stname})\n{filled:.5f} @ ${fpx:,.2f} · ${filled*fpx:,.0f}\n"
-                            f"stop ${b['stop']:,.2f} ({100*(b['stop']/fpx-1):+.1f}%)", "trade", cfg)
+                alerts.send(alerts.buy_msg(sym), "trade", cfg)
             else:
                 p = book.pop(key)
                 exit_px = fpx * (1 - cost)
@@ -227,10 +225,7 @@ def run_once(dry: bool = False) -> int:
                             (sym, stname, p["entry_ts"], ts_label, p["entry_price"], exit_px, filled, pnl,
                              100 * (exit_px / p["entry_price"] - 1), filled * (p["entry_price"] + exit_px) * cost, reason, p["bars_held"]))
                 risk.on_trade_closed(pnl)
-                emoji = "✅" if pnl >= 0 else "🔻"
-                alerts.send(f"{emoji} <b>SELL</b> {sym} ({stname}) · {reason}\n{filled:.5f} @ ${fpx:,.2f}\n"
-                            f"P&L {'+' if pnl>=0 else '−'}${abs(pnl):,.0f} ({100*(exit_px/p['entry_price']-1):+.1f}%) "
-                            f"after fees · held {p.get('bars_held',0)} {cfg.universe.timeframe} bars", "trade", cfg)
+                alerts.send(alerts.sell_msg(sym, reason, pnl), "trade", cfg)
                 if filled < p["units"] * 0.999:  # partial exit: keep remainder
                     p["units"] -= filled
                     book[key] = p
@@ -250,7 +245,7 @@ def run_once(dry: bool = False) -> int:
             eqs = pd.read_sql("SELECT * FROM equity ORDER BY ts", con)
             if len(eqs) > 24 * 7:
                 wk = eqs.equity.iloc[-1] / eqs.equity.iloc[-24 * 7] - 1
-                alerts.send(f"📊 Weekly: {wk*100:+.2f}% · equity ${equity:,.0f} · {len(book)} open", "weekly_report", cfg)
+                alerts.send(alerts.weekly_msg(wk, equity, len(book)), "weekly_report", cfg)
 
         write_dashboard(cfg, con, st, hourly, broker, status)
         return 0
