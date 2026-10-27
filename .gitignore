@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+data/*.parquet
+.env
+docs/backtest_synthetic.html
+.bootstrap.tar.gz
