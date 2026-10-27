@@ -19,9 +19,10 @@ Paper trading crypto bot (BTC/USD, ETH/USD) on Alpaca paper. Live mode is refuse
   - Cause is fees: median 5m ATR is 0.15% (BTC) / 0.20% (ETH), so a 2R target (~0.45% / ~0.61%) is at or below the 0.60% round trip cost. At zero cost: +42%, PF 1.04, avg trade +0.004%, i.e. no real edge.
   - **Do not tune this spec.** Any new day trading idea needs its own locked spec and a fresh test period.
   - Data: Coinbase public 5m candles from 2023-01-01, cached in `data/*_5m.parquet` (gitignored, too big).
-- **Next: 1h volatility breakout ("slow day trading").** Spec and settings locked BEFORE any backtest (2b76f14): `docs/BREAKOUT1H_SPEC.md`, `config_breakout1h.yaml`.
-  - Not built yet: signals + engine (reuse `bot/daytrade.py` patterns, add fee filter and 48 bar time stop), a CLI command, tests incl. no lookahead.
-  - Dev period 2020 to 2024 is for code checks only; any setting change goes in the spec's change log and gets committed before the holdout. Holdout 2025-01-01 onward runs ONCE.
+- **1h volatility breakout ("slow day trading").** Spec and settings locked BEFORE any backtest (2b76f14): `docs/BREAKOUT1H_SPEC.md`, `config_breakout1h.yaml`.
+  - Built: `bot/breakout1h.py`, `tests/test_breakout1h.py`, `python cli.py breakout1h-backtest` (dev check). `--holdout` is the one shot verdict and refuses to run twice.
+  - **Dev check (2020 to 2024) FAILED:** -58%, Sharpe -0.96, PF 0.86, 1,024 trades (`docs/breakout1h_dev.md`). Zero cost +169%, PF 1.22: real signal, but the 0.60% round trip is about a third of 1R. Maker fees only get it to breakeven.
+  - **Holdout NOT run.** Andres's call: run it as locked, or write a new spec with a written reason first.
   - Don't write to the tracked `data/*_1h.parquet` files (the live bot commits them); work from a copy.
   - Paper trading only if it passes: same Telegram bot with a "[1h]" tag, separate Alpaca paper account, needs the always on server.
 - **Local setup:** venv at `.venv` (Python 3.13). System Python is 3.9 with no deps.

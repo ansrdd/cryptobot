@@ -7,3 +7,5 @@ docs/backtest_synthetic.html
 data/*_5m.parquet
 .venv/
 docs/daytrade_backtest_synthetic.md
+data/research/
+docs/breakout1h_synthetic.md
