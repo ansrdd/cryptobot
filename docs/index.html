@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CryptoBot — Paper</title>
+<style>
+:root{color-scheme:light;--surface:#fcfcfb;--card:#ffffff;--border:#e6e5e1;--text:#0b0b0b;--text2:#52514e;--muted:#8a8984;--bot:#2a78d6;--bench:#9a9892;--good:#008300;--bad:#c93a39;--grid:#ecebe7;--trend:#2a78d6;--meanrev:#eb6834;}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){color-scheme:dark;--surface:#141413;--card:#1a1a19;--border:#2c2c2a;--text:#f0efec;--text2:#c3c2b7;--muted:#8a8984;--bot:#3987e5;--bench:#8a8984;--good:#3fb950;--bad:#e66767;--grid:#262624;--trend:#3987e5;--meanrev:#d95926;}}
+:root[data-theme=dark]{color-scheme:dark;--surface:#141413;--card:#1a1a19;--border:#2c2c2a;--text:#f0efec;--text2:#c3c2b7;--muted:#8a8984;--bot:#3987e5;--bench:#8a8984;--good:#3fb950;--bad:#e66767;--grid:#262624;--trend:#3987e5;--meanrev:#d95926;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--surface);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,sans-serif;padding:16px}
+.wrap{max-width:1100px;margin:0 auto}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;margin:4px 0 16px}
+header h1{font-size:20px;margin:0;font-weight:650}
+.pill{font-size:12px;padding:3px 10px;border-radius:999px;border:1px solid var(--border);color:var(--text2)}
+.pill.good{color:var(--good);border-color:var(--good)}.pill.bad{color:var(--bad);border-color:var(--bad)}.pill.warn{color:#b26a00;border-color:#b26a00}
+.meta{margin-left:auto;font-size:12px;color:var(--muted)}
+.hero{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:12px}
+.tile{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+.tile .lbl{font-size:12px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em}
+.tile .val{font-size:26px;font-weight:650;margin-top:4px;font-variant-numeric:tabular-nums}
+.tile .val.big{font-size:34px}
+.tile .sub{font-size:12px;color:var(--muted);margin-top:2px}
+.good{color:var(--good)}.bad{color:var(--bad)}.muted{color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
+.card h2{font-size:15px;margin:0 0 10px;font-weight:650;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.card h2 .sub{font-size:12px;font-weight:400;color:var(--muted)}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--text2);margin-bottom:6px}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:6px}
+.chart{position:relative}
+.chart svg{width:100%;height:auto;display:block;overflow:visible}
+.grid{stroke:var(--grid);stroke-width:1}
+.axis{fill:var(--muted);font-size:11px}
+.xhair{stroke:var(--text2);stroke-width:1;stroke-dasharray:3 3}
+.tip{position:absolute;pointer-events:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.12);white-space:nowrap}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+table{width:100%;border-collapse:collapse;font-size:13px;font-variant-numeric:tabular-nums}
+th{text-align:left;font-weight:600;color:var(--text2);font-size:12px;padding:6px 8px;border-bottom:1px solid var(--border)}
+td{padding:6px 8px;border-bottom:1px solid var(--grid)}
+th.money,td.money,th.pct,td.pct,th.num,td.num,th.int,td.int,th.price,td.price{text-align:right}
+.note{font-size:12px;color:var(--muted);margin:8px 0 0}
+.scroll{max-height:420px;overflow:auto}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 16px;font-size:13px}
+.stats div span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.stats div b{font-weight:600;font-variant-numeric:tabular-nums}
+footer{font-size:12px;color:var(--muted);margin:16px 4px}
+</style></head><body><div class="wrap">
+<header>
+  <h1>CryptoBot — Paper</h1>
+  <span class="pill good">Running</span>
+  <span class="pill">PAPER</span>
+  <span class="meta">Last run 2026-10-27 07:07 UTC</span>
+</header>
+
+<section class="hero">
+  <div class="tile"><div class="lbl">Total P&amp;L</div>
+    <div class="val big good">+$0</div>
+    <div class="sub good">+0.0% · after fees &amp; slippage</div></div>
+  <div class="tile"><div class="lbl">Balance</div><div class="val">$100,000</div><div class="sub">started $100,000</div></div>
+  <div class="tile"><div class="lbl">vs Buy &amp; hold</div>
+    <div class="val good">+0.0%</div>
+    <div class="sub">B&amp;H +0.0% same period</div></div>
+  <div class="tile"><div class="lbl">Today</div><div class="val bad">—</div><div class="sub">last 24h</div></div>
+  <div class="tile"><div class="lbl">This week</div><div class="val bad">—</div><div class="sub">last 7d</div></div>
+  <div class="tile"><div class="lbl">This month</div><div class="val bad">—</div><div class="sub">last 30d</div></div>
+  <div class="tile"><div class="lbl">Drawdown</div><div class="val ">0.0%</div>
+    <div class="sub">max 0.0% · kill at 15%</div></div>
+</section>
+
+<section class="card">
+  <h2>Equity curve <span class="sub">bot vs. buying and holding BTC/USD</span></h2>
+  <div class="legend"><span><i style="background:var(--bot)"></i>Bot</span><span><i style="background:var(--bench)"></i>Buy &amp; hold</span></div>
+  
+<div class="chart" data-chart="equity">
+<svg viewBox="0 0 900 280" preserveAspectRatio="none" id="equity">
+<line x1="64" x2="884" y1="239.4" y2="239.4" class="grid"/><text x="56" y="243.4" text-anchor="end" class="axis">$100,000</text><line x1="64" x2="884" y1="169.1" y2="169.1" class="grid"/><text x="56" y="173.1" text-anchor="end" class="axis">$100,000</text><line x1="64" x2="884" y1="98.9" y2="98.9" class="grid"/><text x="56" y="102.9" text-anchor="end" class="axis">$100,001</text><line x1="64" x2="884" y1="28.6" y2="28.6" class="grid"/><text x="56" y="32.6" text-anchor="end" class="axis">$100,001</text><text x="64.0" y="272" text-anchor="middle" class="axis">Oct 27 26</text><text x="64.0" y="272" text-anchor="middle" class="axis">Oct 27 26</text><text x="64.0" y="272" text-anchor="middle" class="axis">Oct 27 26</text><text x="64.0" y="272" text-anchor="middle" class="axis">Oct 27 26</text><text x="64.0" y="272" text-anchor="middle" class="axis">Oct 27 26</text><text x="884.0" y="272" text-anchor="middle" class="axis">Oct 27 26</text><polyline fill="none" stroke="var(--bot)" stroke-width="2" stroke-linejoin="round" points="64.0,239.4 884.0,239.4"/><polyline fill="none" stroke="var(--bench)" stroke-width="2" stroke-linejoin="round" points="64.0,239.4 884.0,239.4"/>
+<line class="xhair" x1="0" x2="0" y1="16" y2="252" style="display:none"/>
+</svg>
+<div class="tip" style="display:none"></div>
+<script type="application/json" id="equity-data">{"x": ["2026-10-27 06:00", "2026-10-27 07:00"], "series": {"Bot": [100000.0, 100000.0], "Buy & hold": [100000.0, 100000.0]}, "colors": {"Bot": "var(--bot)", "Buy & hold": "var(--bench)"}, "padL": 64, "padR": 16, "W": 900, "fmt": "money"}</script>
+</div>
+</section>
+
+<section class="card">
+  <h2>Drawdown from peak <span class="sub">how deep the holes get — this is the stability metric</span></h2>
+  
+<div class="chart" data-chart="dd">
+<svg viewBox="0 0 900 160" preserveAspectRatio="none" id="dd">
+<line x1="64" x2="884" y1="125.8" y2="125.8" class="grid"/><text x="56" y="129.8" text-anchor="end" class="axis">0%</text><line x1="64" x2="884" y1="91.3" y2="91.3" class="grid"/><text x="56" y="95.3" text-anchor="end" class="axis">0%</text><line x1="64" x2="884" y1="56.7" y2="56.7" class="grid"/><text x="56" y="60.7" text-anchor="end" class="axis">1%</text><line x1="64" x2="884" y1="22.2" y2="22.2" class="grid"/><text x="56" y="26.2" text-anchor="end" class="axis">1%</text><text x="64.0" y="152" text-anchor="middle" class="axis">Oct 27 26</text><text x="64.0" y="152" text-anchor="middle" class="axis">Oct 27 26</text><text x="64.0" y="152" text-anchor="middle" class="axis">Oct 27 26</text><text x="64.0" y="152" text-anchor="middle" class="axis">Oct 27 26</text><text x="64.0" y="152" text-anchor="middle" class="axis">Oct 27 26</text><text x="884.0" y="152" text-anchor="middle" class="axis">Oct 27 26</text><polyline fill="none" stroke="var(--bot)" stroke-width="2" stroke-linejoin="round" points="64.0,125.8 884.0,125.8"/><polyline fill="none" stroke="var(--bench)" stroke-width="2" stroke-linejoin="round" points="64.0,125.8 884.0,125.8"/>
+<line class="xhair" x1="0" x2="0" y1="16" y2="132" style="display:none"/>
+</svg>
+<div class="tip" style="display:none"></div>
+<script type="application/json" id="dd-data">{"x": ["2026-10-27 06:00", "2026-10-27 07:00"], "series": {"Bot": [0.0, 0.0], "Buy & hold": [0.0, 0.0]}, "colors": {"Bot": "var(--bot)", "Buy & hold": "var(--bench)"}, "padL": 64, "padR": 16, "W": 900, "fmt": "pct"}</script>
+</div>
+</section>
+
+<div class="grid2">
+<section class="card"><h2>Performance</h2>
+  <div class="stats">
+    <div><span>Realized</span><b class="good">+$0</b></div>
+    <div><span>Unrealized</span><b class="good">+$0</b></div>
+    <div><span>Sharpe</span><b>—</b></div>
+    <div><span>Calmar</span><b>—</b></div>
+    <div><span>Profit factor</span><b>—</b></div>
+    <div><span>Win rate</span><b>—</b></div>
+    <div><span>Trades</span><b>0</b></div>
+    <div><span>Avg win</span><b class="good">+$0</b></div>
+    <div><span>Avg loss</span><b class="bad">+$0</b></div>
+    <div><span>Longest underwater</span><b>— d</b></div>
+    <div><span>CAGR</span><b>—</b></div>
+    <div><span>B&amp;H max DD</span><b>—</b></div>
+  </div>
+</section>
+<section class="card"><h2>Open positions</h2>
+  <table><thead><tr><th>Symbol</th><th>Strategy</th><th class=num>Units</th><th class=price>Entry</th><th class=price>Now</th><th class=price>Stop</th><th class=money>Unrealized</th></tr></thead>
+  <tbody><tr><td colspan=7 class=muted>Flat — no open positions</td></tr></tbody></table>
+</section>
+</div>
+
+<div class="grid2">
+<section class="card"><h2>By strategy</h2>
+  <table><thead><tr><th class="text">Strategy</th><th class="int">Trades</th><th class="money">P&amp;L</th><th class="num">Win %</th></tr></thead><tbody><tr><td colspan=99 class=muted>No trades yet</td></tr></tbody></table></section>
+<section class="card"><h2>By symbol</h2>
+  <table><thead><tr><th class="text">Symbol</th><th class="int">Trades</th><th class="money">P&amp;L</th><th class="num">Win %</th></tr></thead><tbody><tr><td colspan=99 class=muted>No trades yet</td></tr></tbody></table></section>
+<section class="card"><h2>By exit reason</h2>
+  <table><thead><tr><th class="text">Reason</th><th class="int">Trades</th><th class="money">P&amp;L</th></tr></thead><tbody><tr><td colspan=99 class=muted>No trades yet</td></tr></tbody></table></section>
+</div>
+
+
+
+<section class="card">
+  <h2>Trade log <span class="sub">most recent first · 0 total</span></h2>
+  <div class="scroll"><table><thead><tr><th class="dt">Closed</th><th class="text">Symbol</th><th class="text">Strategy</th><th class="price">Entry</th><th class="price">Exit</th><th class="num">Units</th><th class="money">P&amp;L</th><th class="pct">%</th><th class="text">Exit reason</th><th class="int">Hours</th></tr></thead><tbody><tr><td colspan=99 class=muted>No trades yet</td></tr></tbody></table></div>
+</section>
+
+<section class="card"><h2>Notes</h2><p class="note" style="font-size:13px;color:var(--text2)">Paper trading since 2026-10-27. Judge after 90 days, not 9.</p></section>
+
+<footer>P&amp;L is net of 25 bps fees + 5 bps slippage per side, applied even on paper so the numbers stay honest. Paper trading only. Not financial advice.</footer>
+</div>
+<script>
+document.querySelectorAll('.chart').forEach(function(ch){
+  var svg=ch.querySelector('svg'), tip=ch.querySelector('.tip'), xh=svg.querySelector('.xhair');
+  var d=JSON.parse(ch.querySelector('script[type="application/json"]').textContent);
+  var n=d.x.length, keys=Object.keys(d.series);
+  function fmt(v){ if(v==null) return '—'; return d.fmt==='money' ? '$'+Math.round(v).toLocaleString() : v.toFixed(2)+'%'; }
+  svg.addEventListener('mousemove',function(e){
+    var r=svg.getBoundingClientRect(); var px=(e.clientX-r.left)/r.width*d.W;
+    var i=Math.round((px-d.padL)/(d.W-d.padL-d.padR)*(n-1)); i=Math.max(0,Math.min(n-1,i));
+    var sx=d.padL+(d.W-d.padL-d.padR)*i/Math.max(n-1,1);
+    xh.setAttribute('x1',sx); xh.setAttribute('x2',sx); xh.style.display='';
+    tip.innerHTML='<b>'+d.x[i]+'</b><br>'+keys.map(function(k){return '<span style="color:'+d.colors[k]+'">●</span> '+k+' '+fmt(d.series[k][i]);}).join('<br>');
+    tip.style.display=''; var lx=(e.clientX-r.left); tip.style.left=(lx>r.width*0.7? lx-tip.offsetWidth-12 : lx+12)+'px'; tip.style.top='8px';
+  });
+  svg.addEventListener('mouseleave',function(){xh.style.display='none';tip.style.display='none';});
+});
+</script>
+</body></html>
