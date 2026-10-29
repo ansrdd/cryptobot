@@ -118,3 +118,43 @@ def load_5m(sym: str, history_start: str) -> pd.DataFrame:
         if close is not None and close > pd.Timestamp.now(tz=NY) - timedelta(minutes=20):
             df = df[df.index.tz_convert(NY).date != last_day]
     return df
+
+
+def premarket_and_regular(df: pd.DataFrame, cal: pd.DataFrame, pre_start: str = "04:00") -> pd.DataFrame:
+    """Keep bars that START between pre_start (New York) and the session close on trading days."""
+    if not len(df):
+        return df
+    ny = pd.Series(df.index.tz_convert(NY), index=df.index)
+    sess = cal.set_index(cal["date"].dt.date)
+    d = pd.Series(ny.dt.date.to_numpy(), index=df.index)
+    c = d.map(sess["close"])
+    pre = pd.to_datetime(d.astype(str) + " " + pre_start).dt.tz_localize(NY)
+    keep = c.notna() & (ny >= pre) & (ny < c)
+    return df[keep.to_numpy()]
+
+
+def load_5m_ext(sym: str, history_start: str, pre_start: str = "04:00") -> pd.DataFrame:
+    """Like load_5m, but also keeps premarket bars (pre_start to 9:30) for overnight levels.
+    Cache: data/research/<SYMBOL>_5m_ext.parquet. Adds a bool column 'rth' (regular hours bar)."""
+    CACHE.mkdir(parents=True, exist_ok=True)
+    p = CACHE / f"{sym}_5m_ext.parquet"
+    df = pd.read_parquet(p) if p.exists() else pd.DataFrame()
+    start = (df.index[-1] + timedelta(minutes=5)).to_pydatetime() if len(df) \
+        else pd.Timestamp(history_start, tz="UTC").to_pydatetime()
+    end = datetime.now(timezone.utc) - timedelta(minutes=20)
+    cal = calendar(history_start)
+    if start < end:
+        new = premarket_and_regular(_fetch(sym, start, end), cal, pre_start)
+        if len(new):
+            df = pd.concat([df, new]) if len(df) else new
+            df = df[~df.index.duplicated(keep="last")].sort_index()
+            df.to_parquet(p)
+    if not len(df):
+        return df
+    df = df.copy()
+    df["rth"] = regular_hours(df, cal).reindex(df.index)["close"].notna().to_numpy()
+    last_day = df.index[-1].tz_convert(NY).date()
+    close = cal.set_index(cal["date"].dt.date)["close"].get(last_day)
+    if close is not None and close > pd.Timestamp.now(tz=NY) - timedelta(minutes=20):
+        df = df[df.index.tz_convert(NY).date != last_day]
+    return df

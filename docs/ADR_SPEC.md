@@ -91,4 +91,10 @@ Forward paper test on a separate Alpaca paper account for at least 3 months, sam
 
 ## Change log
 
-- (none yet)
+- 2026-10-29, before any backtest (committed with the code, nothing has been run on real data): how the code reads the parts the text left open.
+  - Steps 3 and 5 together: after the sweep, a bar that trades past the sweep low but **closes back above the level** just extends the sweep low. A bar that **closes below the level** kills the setup.
+  - The structure level is the last 5m swing high already confirmed (2 bars on its right closed) at the sweep bar. 5m swings run on regular hours bars across days.
+  - A setup that dies, or an order that never fills, is not a trade, so the bot can keep looking for a new sweep later that morning. The one trade per symbol per day rule counts filled trades only.
+  - On the bar an order fills, only the stop can also hit; a target touch on that same bar is ignored (order inside the bar is unknown).
+  - Share counts are whole shares (Alpaca can't short fractional shares). The 3% daily loss halt blocks new setups; an order already placed can still fill.
+  - Alpaca SIP data starts 2016-01-04, so there is no warm up before dev. Bias is "none" (no trades) until the 1H chart has two swing highs and two swing lows.
