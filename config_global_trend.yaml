@@ -1,0 +1,50 @@
+# ============================================================
+#  GLOBAL TREND SPEC: MULTI ASSET TREND FOLLOWING WITH ETFs (research)
+#  Locked BEFORE any data is downloaded. See docs/GLOBAL_TREND_SPEC.md.
+#  Do not edit these numbers to make a backtest look better.
+#  The live daily crypto bot (config.yaml) is untouched by this file.
+# ============================================================
+
+universe:
+  risk_assets: ["SPY", "EFA", "EEM", "IEF", "TLT", "GLD", "DBC", "VNQ"]
+  cash_asset: "SHY"            # holds whatever isn't invested
+  data_source: "yahoo"         # daily adjusted OHLC; Alpaca only goes back to 2016
+  data_check:                  # Yahoo vs Alpaca daily returns, 2016+, before any backtest
+    max_return_diff_pct: 0.1
+    max_days_over_pct: 1.0
+
+periods:
+  dev_start: "2007-02-01"
+  dev_end: "2016-12-31"
+  holdout_start: "2017-01-01"  # the verdict, run ONCE, to the run date
+
+signal:
+  lookback_months: [1, 3, 12]  # trend score = share of these with total return > 0
+  vol_days: 63                 # daily return stdev window for risk weights
+  rebalance: "month_end_close" # decide on the last trading day's close
+  fill: "next_open"
+  min_trade_pct: 0.5           # skip trades smaller than this % of equity
+  long_only: true
+  max_invested_pct: 100        # no leverage
+
+costs:
+  fee_bps: 0
+  slippage_bps: 2              # per side
+  diagnostics:                 # NOT the verdict
+    stress: { fee_bps: 0, slippage_bps: 5 }
+    zero_cost: { fee_bps: 0, slippage_bps: 0 }
+
+benchmarks:
+  spy: { SPY: 1.0 }
+  sixty_forty: { SPY: 0.6, IEF: 0.4 }   # rebalanced monthly
+  equal_weight: "risk_assets"           # buy and hold, rebalanced monthly
+
+passing_bar:                   # holdout only, all must hold, at real costs
+  min_sharpe: 0.5              # monthly returns, annualized, 0% risk free
+  sharpe_at_least: "sixty_forty"
+  max_dd_vs_spy_ratio: 0.5     # our max drawdown <= half of SPY's
+  min_total_return_pct: 0.0
+  min_pct_years_profitable: 60
+
+account:
+  starting_equity: 100000
