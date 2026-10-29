@@ -180,3 +180,68 @@ def test_bias_only_uses_closed_sessions():
     df2.loc[on_last, ["high", "low"]] *= 3     # wreck the last session
     b2 = adr.daily_bias(df2, 2)
     assert b1[last] == b2[last]
+
+
+# ---------------------------------------------------------------- ADR Loose (config_adr_loose.yaml)
+LOOSE = adr.load_config(adr.ROOT / "config_adr_loose.yaml")
+
+
+def test_loose_config_differs_only_where_the_spec_says():
+    import copy
+    a, b = copy.deepcopy(CFG), copy.deepcopy(LOOSE)
+    for k in ("levels", "require_smt", "min_target_r", "target_pick", "fallback_target_r", "targets"):
+        a["setup"].pop(k, None), b["setup"].pop(k, None)
+    assert a == b
+    assert LOOSE["setup"]["require_smt"] is False and LOOSE["setup"]["min_target_r"] == 1.0
+
+
+def test_loose_trades_without_smt_and_logs_it():
+    spy = _flat(len(LONG_DAY))
+    spy[3] = (200.0, 200.1, 189.0, 200.0)       # SPY also sweeps: no divergence
+    t = _run(LONG_DAY, spy_day=spy, cfg=LOOSE).trades_df
+    assert t.smt.tolist() == [False]
+    t2 = _run(LONG_DAY, cfg=LOOSE).trades_df
+    assert t2.smt.tolist() == [True]
+
+
+def test_loose_picks_nearest_pool_clearing_1r():
+    # premarket high 101.5 is only 0.6 above the 100.9 entry (R = 1.01): skipped, PDH 110 clears 1R
+    t = _run(LONG_DAY, cfg=LOOSE, pre=(101.5, 101.5)).trades_df
+    assert len(t) == 1
+    assert t.iloc[0].target_kind == "prev_day"
+    # ADR rejects the same day (nearest pool under 2R)
+    assert len(_run(LONG_DAY, pre=(101.5, 101.5)).trades) == 0
+
+
+def test_loose_falls_back_to_fixed_2r():
+    # no pool above entry at all: PDH and premarket high both below the 100.9 entry
+    t = _run(LONG_DAY, cfg=LOOSE, prev=(100.0, 100.5), pre=(102.0, 100.6)).trades_df
+    assert len(t) == 1 and t.iloc[0].target_kind == "fixed"
+    assert t.iloc[0].reason == "target"
+    assert t.iloc[0].exit_price == pytest.approx((100.9 + 2 * (100.9 - 99.89)) * 0.9998)
+
+
+def test_untouched_h1_levels():
+    # 1H bars built from 12 x 5m bars each; one clear 1H swing low at hour 2 (low 95)
+    lows = [100, 98, 95, 97, 99, 99, 99]
+    rows = []
+    t0 = pd.Timestamp("2024-03-05 09:30", tz=NY)
+    k = 0
+    for d in range(2):
+        day0 = t0 + pd.Timedelta(days=d)
+        for m in range(78):
+            hr = k // 12
+            lo = lows[hr] if hr < len(lows) else 99
+            rows.append((day0 + pd.Timedelta(minutes=5 * m), lo + 1, lo + 2, lo, lo + 1))
+            k += 1
+    df = pd.DataFrame(rows, columns=["ts", "open", "high", "low", "close"]).set_index("ts")
+    df.index = df.index.tz_convert("UTC")
+    u = adr.untouched_h1(df, 2)
+    # confirmed when 1H bar 4 (hour index 4, the 5th hour) closes: 5m bar 60 onward
+    assert np.isnan(u["h1_lo_before"].iloc[59]) or u["h1_lo_before"].iloc[59] != 95
+    assert u["h1_lo_before"].iloc[60] == 95
+    # a later bar trading below 95 removes it
+    df2 = df.copy()
+    df2.iloc[70, df2.columns.get_loc("low")] = 94
+    u2 = adr.untouched_h1(df2, 2)
+    assert u2["h1_lo_before"].iloc[70] == 95 and np.isnan(u2["h1_lo_after"].iloc[70])

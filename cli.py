@@ -16,6 +16,7 @@
   python cli.py qqq-backtest --holdout  # its one shot verdict → docs/qqq_daytrade_holdout.md
   python cli.py adr-backtest            # ADR spec (TJR style) on QQQ + SPY 5m DEV check → docs/adr_dev.md
   python cli.py adr-backtest --holdout  # its one shot verdict → docs/adr_holdout.md
+  python cli.py adr-backtest --loose    # ADR Loose spec DEV check → docs/adr_loose_dev.md (--holdout once)
 """
 from __future__ import annotations
 
@@ -217,9 +218,11 @@ def cmd_qqq_backtest(args):
 def cmd_adr_backtest(args):
     """ADR spec, TJR style model on QQQ + SPY 5m (docs/ADR_SPEC.md). Dev by default; holdout once, ever."""
     from bot import adr, stocks_data
-    cfg = adr.load_config()
+    tag = "adr_loose" if args.loose else "adr"
+    spec = "docs/ADR_LOOSE_SPEC.md" if args.loose else "docs/ADR_SPEC.md"
+    cfg = adr.load_config(ROOT / f"config_{tag}.yaml")
     period = "holdout" if args.holdout else "dev"
-    out = ROOT / "docs" / f"adr_{period}.md"
+    out = ROOT / "docs" / f"{tag}_{period}.md"
     if period == "holdout" and out.exists():
         print(f"  refusing: the holdout already ran ({out}). It runs ONCE. See the spec.")
         return 1
@@ -228,7 +231,8 @@ def cmd_adr_backtest(args):
     first = max(b.index[0] for b in bars.values()).tz_convert("America/New_York")
     note = (f"Alpaca SIP 5m bars incl. premarket from {u['premarket']['start']}, split + dividend adjusted "
             f"(research copy in data/research). SIP history starts {first:%Y-%m-%d}.")
-    text = adr.report(cfg, bars, period, note)
+    text = adr.report(cfg, bars, period, note, name="ADR Loose spec (looser TJR style)" if args.loose else "ADR spec (TJR style)",
+                      spec=spec, config=f"config_{tag}.yaml")
     print(text)
     out.write_text(text)
     print(f"\n  report → {out}")
@@ -306,6 +310,7 @@ def main():
     qq.add_argument("--synthetic", action="store_true"); qq.set_defaults(fn=cmd_qqq_backtest)
     ad = sub.add_parser("adr-backtest", help="ADR spec (TJR style) on QQQ + SPY 5m: dev check, or --holdout once")
     ad.add_argument("--holdout", action="store_true", help="the one shot verdict on 2023+ data")
+    ad.add_argument("--loose", action="store_true", help="the ADR Loose spec (docs/ADR_LOOSE_SPEC.md)")
     ad.set_defaults(fn=cmd_adr_backtest)
     f = sub.add_parser("fetch"); f.set_defaults(fn=cmd_fetch)
     t = sub.add_parser("telegram", help="find chat id + send test message"); t.set_defaults(fn=cmd_telegram)

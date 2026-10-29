@@ -62,4 +62,7 @@ Forward paper test on a separate Alpaca paper account for at least 3 months, Tel
 
 ## Change log
 
-- (none yet)
+- 2026-10-29, before any backtest of this spec (committed with the code): how the code reads the open parts.
+  - "Most recent untouched 1H swing low" = the newest confirmed 1H swing low that no 5m bar has traded below since; once traded through it is gone. Checked as of the bar's open for sweeps, and after the shift bar for targets.
+  - SMT flag for a 1H swing sweep: did the other ETF trade below its own untouched 1H swing low (as of 9:30) since 9:30.
+  - Everything shared with ADR runs through the same code; ADR's dev result was rerun after the change and is identical (6 trades, -0.48%, PF 0.12).

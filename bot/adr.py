@@ -39,7 +39,7 @@ def load_config(path: str | Path | None = None) -> dict:
 class Trade:
     symbol: str
     side: str            # long | short
-    level: str           # which level was swept: prev_day | premarket
+    level: str           # which level was swept: prev_day | premarket | h1_swing
     entry_ts: pd.Timestamp
     exit_ts: pd.Timestamp
     entry_price: float   # fill incl. costs
@@ -50,6 +50,8 @@ class Trade:
     r: float             # pnl / dollars risked at entry
     reason: str          # target | stop | close
     bars_held: int
+    smt: object = None   # True = the other ETF held its level (divergence), False = both swept, None = unknown
+    target_kind: str = ""  # which level the target was, or "fixed" (fallback R multiple)
 
 
 def _hm(s: str) -> int:
@@ -89,9 +91,39 @@ def hourly_rth(rth: pd.DataFrame) -> pd.DataFrame:
     mins = (ny.hour * 60 + ny.minute - 570) // 60
     key = date.astype(str) + "_" + pd.Series(mins, index=rth.index).astype(str)
     g = rth.groupby(key.to_numpy(), sort=False)
-    h = pd.DataFrame({"high": g["high"].max(), "low": g["low"].min(), "date": g.apply(lambda x: x.index[0]).map(
-        lambda t: t.tz_convert(NY).date())})
+    first = g.apply(lambda x: x.index[0])
+    h = pd.DataFrame({"high": g["high"].max(), "low": g["low"].min(), "date": first.map(lambda t: t.tz_convert(NY).date()),
+                      "end": g.apply(lambda x: x.index[-1]) + pd.Timedelta(minutes=5)})
     return h.reset_index(drop=True)
+
+
+def untouched_h1(rth: pd.DataFrame, n: int) -> pd.DataFrame:
+    """Per 5m bar: the most recent confirmed 1H swing low (high) that price hasn't traded below (above)
+    since it was confirmed, as of the bar's open ("_before") and after the bar ("_after").
+    A 1H swing at bar j is confirmed when 1H bar j + n closes."""
+    h = hourly_rth(rth)
+    sh, sl = pivots(h["high"].to_numpy(), h["low"].to_numpy(), n)
+    end, H, Lw = h["end"].to_numpy(), h["high"].to_numpy(), h["low"].to_numpy()
+    ev_lo = [(end[j + n], Lw[j]) for j in np.flatnonzero(sl) if j + n < len(h)]
+    ev_hi = [(end[j + n], H[j]) for j in np.flatnonzero(sh) if j + n < len(h)]
+    ts, hi, lo = rth.index.to_numpy(), rth["high"].to_numpy(), rth["low"].to_numpy()
+    out = np.full((len(rth), 4), np.nan)
+    stk_lo, stk_hi = [], []      # untouched levels; lows rise and highs fall toward the top of each stack
+    a = b = 0
+    for i in range(len(rth)):
+        while a < len(ev_lo) and ev_lo[a][0] <= ts[i]:
+            stk_lo.append(ev_lo[a][1]); a += 1
+        while b < len(ev_hi) and ev_hi[b][0] <= ts[i]:
+            stk_hi.append(ev_hi[b][1]); b += 1
+        out[i, 0] = stk_lo[-1] if stk_lo else np.nan
+        out[i, 1] = stk_hi[-1] if stk_hi else np.nan
+        while stk_lo and stk_lo[-1] > lo[i]:
+            stk_lo.pop()
+        while stk_hi and stk_hi[-1] < hi[i]:
+            stk_hi.pop()
+        out[i, 2] = stk_lo[-1] if stk_lo else np.nan
+        out[i, 3] = stk_hi[-1] if stk_hi else np.nan
+    return pd.DataFrame(out, index=rth.index, columns=["h1_lo_before", "h1_hi_before", "h1_lo_after", "h1_hi_after"])
 
 
 def daily_bias(rth: pd.DataFrame, n: int) -> dict:
@@ -127,6 +159,7 @@ def prepare(bars: pd.DataFrame, cfg: dict) -> dict:
     sh, sl = pivots(hi, lo, n)
     rth["swing_hi"] = last_confirmed(hi, sh, n)
     rth["swing_lo"] = last_confirmed(lo, sl, n)
+    rth = rth.join(untouched_h1(rth, n))
     day = rth.groupby("date").agg(day_high=("high", "max"), day_low=("low", "min"))
     day["pdh"], day["pdl"] = day["day_high"].shift(1), day["day_low"].shift(1)
     pre_ny = pre.index.tz_convert(NY)
@@ -271,36 +304,35 @@ def run(cfg: dict, bars: dict[str, pd.DataFrame], start: str | None = None, end:
                     rng = h - l
                     disp = rng > 0 and abs(cl - o) / rng * 100 >= S["displacement_min_body_pct"]
                     if disp and ((long and cl > o and cl > x["mss"]) or (not long and cl < o and cl < x["mss"])):
-                        _arm(x, long, info[s], run_hi[s], run_lo[s], S, T)   # → "order", or "idle" if no FVG / no room
+                        _arm(x, long, info[s], b, run_hi[s], run_lo[s], S, T)   # → "order", or "idle" if no FVG / no room
                     continue
 
                 # ---- look for a sweep
                 if x["state"] == "idle" and w0 <= mn < w1:
                     swept = []
-                    for lvl, (lo_k, hi_k) in {"prev_day": ("pdl", "pdh"), "premarket": ("pm_low", "pm_high")}.items():
+                    for lvl in ("prev_day", "premarket", "h1_swing"):
                         if lvl not in S["levels"]:
                             continue
-                        L = info[s][lo_k] if long else info[s][hi_k]
+                        L = _level(lvl, long, info[s], b)
                         if pd.isna(L):
                             continue
                         if (long and l < L < cl) or (not long and cl < L < h):
-                            if smt_on:
-                                o_s = other.get(s)
-                                if o_s is None:
-                                    continue
-                                OL = info[o_s][lo_k] if long else info[o_s][hi_k]
+                            smt = None
+                            o_s = other.get(s)
+                            if o_s is not None:
                                 ob = day_bars[o_s]
                                 upto = ob[ob.index <= ts]
-                                if pd.isna(OL) or not len(upto):
-                                    continue
-                                if (long and upto["low"].min() < OL) or (not long and upto["high"].max() > OL):
-                                    continue
-                            swept.append((lvl, L))
+                                OL = _level(lvl, long, info[o_s], ob.iloc[0]) if len(ob) else np.nan
+                                if not pd.isna(OL) and len(upto):
+                                    smt = not bool((long and upto["low"].min() < OL) or (not long and upto["high"].max() > OL))
+                            if smt_on and smt is not True:
+                                continue
+                            swept.append((lvl, L, smt))
                     mss = b["swing_hi"] if long else b["swing_lo"]
                     if swept and not pd.isna(mss):
-                        lvl, L = swept[0]
+                        lvl, L, smt = swept[0]
                         x.update(state="setup", side=side, level=lvl, L=L, sweep_ext=l if long else h,
-                                 mss=mss, i=0, hist=[(h, l)])
+                                 mss=mss, i=0, hist=[(h, l)], smt=smt)
             # equity mark
             for s in syms:
                 x = st[s]
@@ -321,7 +353,16 @@ def run(cfg: dict, bars: dict[str, pd.DataFrame], start: str | None = None, end:
     return Result(eq, trades, killed_at, halt_days)
 
 
-def _arm(x: dict, long: bool, info, sess_hi: float, sess_lo: float, S: dict, T: dict):
+def _level(kind: str, long: bool, info, bar) -> float:
+    """Sell side level for longs / buy side for shorts. h1_swing uses the value as of the bar's open."""
+    if kind == "prev_day":
+        return info["pdl"] if long else info["pdh"]
+    if kind == "premarket":
+        return info["pm_low"] if long else info["pm_high"]
+    return bar["h1_lo_before"] if long else bar["h1_hi_before"]
+
+
+def _arm(x: dict, long: bool, info, bar, sess_hi: float, sess_lo: float, S: dict, T: dict):
     """Shift bar just closed: find the newest FVG from the sweep to the shift bar, check room, place the limit."""
     hist = x["hist"]
     fvg = None
@@ -338,18 +379,28 @@ def _arm(x: dict, long: bool, info, sess_hi: float, sess_lo: float, S: dict, T: 
     off = T["stop_offset"]
     if long:
         entry, stop = fvg[1], x["sweep_ext"] - off
-        cands = [v for k, v in (("prev_day", info["pdh"]), ("premarket", info["pm_high"]),
-                                ("session_extreme", sess_hi)) if k in S["targets"] and not pd.isna(v) and v > entry]
-        tgt = min(cands) if cands else None
+        pools = (("prev_day", info["pdh"]), ("premarket", info["pm_high"]), ("session_extreme", sess_hi),
+                 ("h1_swing", bar["h1_hi_after"]))
     else:
         entry, stop = fvg[0], x["sweep_ext"] + off
-        cands = [v for k, v in (("prev_day", info["pdl"]), ("premarket", info["pm_low"]),
-                                ("session_extreme", sess_lo)) if k in S["targets"] and not pd.isna(v) and v < entry]
-        tgt = max(cands) if cands else None
+        pools = (("prev_day", info["pdl"]), ("premarket", info["pm_low"]), ("session_extreme", sess_lo),
+                 ("h1_swing", bar["h1_lo_after"]))
     r = abs(entry - stop)
-    if tgt is None or r <= 0 or abs(tgt - entry) < S["min_target_r"] * r:
+    if r <= 0:
         return
-    x.update(state="order", entry=entry, stop=stop, target=tgt, valid=T["entry_valid_bars"])
+    cands = sorted((abs(v - entry), k, v) for k, v in pools
+                   if k in S["targets"] and not pd.isna(v) and (v > entry if long else v < entry))
+    if S.get("target_pick", "nearest_then_check") == "nearest_clearing_min":
+        cands = [c for c in cands if c[0] >= S["min_target_r"] * r]      # nearest pool that clears the minimum
+    elif cands and cands[0][0] < S["min_target_r"] * r:
+        cands = []                                                        # ADR: nearest pool must clear it
+    if cands:
+        kind, tgt = cands[0][1], cands[0][2]
+    elif S.get("fallback_target_r"):
+        kind, tgt = "fixed", entry + S["fallback_target_r"] * r if long else entry - S["fallback_target_r"] * r
+    else:
+        return
+    x.update(state="order", entry=entry, stop=stop, target=tgt, target_kind=kind, valid=T["entry_valid_bars"])
 
 
 def _close(x: dict, px: float, cost: float, ts, reason: str, trades: list, sym: str) -> float:
@@ -357,7 +408,8 @@ def _close(x: dict, px: float, cost: float, ts, reason: str, trades: list, sym: 
     out = px * (1 - cost) if long else px * (1 + cost)
     pnl = x["units"] * (out - x["fill"]) if long else x["units"] * (x["fill"] - out)
     trades.append(Trade(sym, x["side"], x["level"], x["entry_ts"], ts, x["fill"], out, x["units"], pnl,
-                        100 * pnl / (x["units"] * x["fill"]), pnl / x["risk_d"], reason, x["bars"]))
+                        100 * pnl / (x["units"] * x["fill"]), pnl / x["risk_d"], reason, x["bars"],
+                        x.get("smt"), x.get("target_kind", "")))
     return pnl
 
 
@@ -396,7 +448,8 @@ def breakdown(tdf: pd.DataFrame, by) -> pd.DataFrame:
                          "avg_r": g["r"].mean(), "profit_factor": g["pnl"].apply(pf)})
 
 
-def report(cfg: dict, bars: dict[str, pd.DataFrame], period: str, note: str) -> str:
+def report(cfg: dict, bars: dict[str, pd.DataFrame], period: str, note: str, name: str = "ADR spec (TJR style)",
+           spec: str = "docs/ADR_SPEC.md", config: str = "config_adr.yaml") -> str:
     pr = cfg["periods"]
     if period == "dev":
         start, end = pr["dev_start"], str((pd.Timestamp(pr["dev_end"]) + pd.Timedelta(days=1)).date())
@@ -414,8 +467,8 @@ def report(cfg: dict, bars: dict[str, pd.DataFrame], period: str, note: str) -> 
     c = cfg["costs"]
     title = "DEV CHECK (not the verdict)" if period == "dev" else "HOLDOUT VERDICT"
     e = res.equity
-    lines = [f"# ADR spec (TJR style) on QQQ + SPY 5m: {title}", "",
-             f"{note} Spec: docs/ADR_SPEC.md. Settings: config_adr.yaml.", "",
+    lines = [f"# {name} on QQQ + SPY 5m: {title}", "",
+             f"{note} Spec: {spec}. Settings: {config}.", "",
              f"Window: {e.index[0].tz_convert(NY):%Y-%m-%d} to {e.index[-1].tz_convert(NY):%Y-%m-%d} New York, "
              f"{e.index.tz_convert(NY).normalize().nunique():,} sessions", "",
              f"## Passing bar at real costs ({c['fee_bps'] + c['slippage_bps']} bps per side): "
@@ -439,7 +492,8 @@ def report(cfg: dict, bars: dict[str, pd.DataFrame], period: str, note: str) -> 
     row("short only", go(sides=("short",)))
     for s in bars:
         row(f"{s} only", go(trade_symbols=[s]))
-    row("without the SMT check", go(require_smt=False))
+    smt_req = cfg["setup"]["require_smt"]
+    row("without the SMT check" if smt_req else "with SMT required", go(require_smt=not smt_req))
     lines += [""]
     for s in bars:
         r = prep[s]["rth"]
@@ -447,7 +501,7 @@ def report(cfg: dict, bars: dict[str, pd.DataFrame], period: str, note: str) -> 
         lines.append(f"Buy and hold {s} over the same window: {100 * (w['close'].iloc[-1] / w['open'].iloc[0] - 1):+.1f}%")
     lines += ["", "Per symbol, side, swept level and exit reason. Picking the best row after seeing this is curve fitting; "
               "any follow up needs its own locked spec.", ""]
-    for by in ("symbol", "side", "level", "reason"):
+    for by in ("symbol", "side", "level", "reason", "smt", "target_kind"):
         b = breakdown(tdf, by)
         if len(b):
             lines += ["```", b.round(2).to_string(), "```", ""]
