@@ -43,7 +43,10 @@ Paper trading crypto bot (BTC/USD, ETH/USD) on Alpaca paper. Live mode is refuse
   - 1H swing bias, sweep of prev day / premarket level 9:30 to 11:00 that closes back inside, SMT (other ETF didn't sweep), displacement close past the last 5m swing, limit at the FVG edge (trade through to fill), stop past the sweep, target opposite liquidity at least 2R.
   - Dev v1: 0 trades (session high as a target meant 2R never fit; `docs/adr_dev_v1.md`). v2 (17f93fa) dropped that target. **v2 dev FAILED: 6 trades in 7 years, 1 win, -0.5%** (`docs/adr_dev.md`). Too strict to trade; no v3. Holdout 2023+ never run, so it's still unseen.
   - No Alpaca bars before 4 AM, so Asia/London levels aren't possible on ETFs (would need NQ/ES futures data; Andres said skip).
-- **Next:** a looser TJR spec drafted for review (own spec, locked before any run). Recheck Google billing in a couple weeks (2026-10-29: $0.08 usage, all covered by free trial savings).
+- **ADR Loose spec: CLOSED (2026-10-29).** `docs/ADR_LOOSE_SPEC.md` + `config_adr_loose.yaml` (locked 49e9f3f, code 8d99223), `python cli.py adr-backtest --loose`. Same model, but SMT optional, untouched 1H swings count as liquidity, target = nearest pool at least 1R away else fixed 2R.
+  - **Dev FAILED:** 58 trades, -4.2%, Sharpe -0.97, PF 0.39, won 26% vs 48% breakeven (`docs/adr_loose_dev.md`). Zero cost PF 0.50: no edge even for free. 32 of 58 hit the stop. Holdout not run, by Andres's choice.
+- **TJR track CLOSED (2026-10-29).** Coded strictly (6 trades in 7 years) and loosely (losing at zero cost), the TJR model has no edge on QQQ/SPY 5m. Whatever edge it has is discretion, or futures and Asia/London levels we can't get. Don't tune either spec.
+- **Next:** recheck Google billing in a couple weeks (2026-10-29: $0.08 usage, all covered by free trial savings).
 - **Local setup:** venv at `.venv` (Python 3.13). System Python is 3.9 with no deps. Local `.env` (gitignored) holds the Alpaca paper keys for stock data; never print or commit it.
 
 ## Commands

@@ -66,3 +66,4 @@ Forward paper test on a separate Alpaca paper account for at least 3 months, Tel
   - "Most recent untouched 1H swing low" = the newest confirmed 1H swing low that no 5m bar has traded below since; once traded through it is gone. Checked as of the bar's open for sweeps, and after the shift bar for targets.
   - SMT flag for a 1H swing sweep: did the other ETF trade below its own untouched 1H swing low (as of 9:30) since 9:30.
   - Everything shared with ADR runs through the same code; ADR's dev result was rerun after the change and is identical (6 trades, -0.48%, PF 0.12).
+- 2026-10-29, **CLOSED.** Dev check (docs/adr_loose_dev.md) FAILED: 58 trades, -4.22%, Sharpe -0.97, PF 0.39, win rate 25.9% vs 48.1% breakeven. Zero cost PF 0.50, so no edge even for free. Holdout not run (Andres's call: the dev result already shows no edge). No v2. TJR track closed.
