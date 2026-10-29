@@ -39,7 +39,11 @@ Paper trading crypto bot (BTC/USD, ETH/USD) on Alpaca paper. Live mode is refuse
   - **Dev check (2016 to 2022) FAILED hard:** -93%, Sharpe -3.30, PF 0.72, 8,413 trades, 1 of 28 quarters up (`docs/qqq_daytrade_dev.md`). Median 1R is 0.19% of price, so 0.04% round trip is ~1/5 of 1R; avg trade before costs +0.008%. Zero cost +95%, PF 1.07 vs buy and hold +158%.
   - **HOLDOUT (2023+, the verdict) FAILED:** -84%, Sharpe -4.81, PF 0.69, 4,500 trades, 0 of 16 quarters up (`docs/qqq_daytrade_holdout.md`). Zero cost PF 0.99: no edge even for free. Buy and hold +171%. Closed; don't tune.
 - **Day trading track CLOSED (2026-10-27).** Four strategies built and tested with locked specs; none passed (5m crypto, 1h breakout, 1h learner, 5m QQQ). Lesson: cost relative to the move kills short timeframe trading, not fee size, and none of these signals had a real edge out of sample. The daily trend bot is the only strategy running. Any new idea needs its own locked spec and fresh data; the holdouts above are spent.
-- **Next:** confirm the server's cron runs every hour and the bill stays ~$0 (free tier e2-micro; first days' billing not yet verified).
+- **ADR spec (TJR style model, named after Andres) on QQQ + SPY 5m: CLOSED (2026-10-29).** Spec `docs/ADR_SPEC.md` + `config_adr.yaml` (locked 766a0b9), code `bot/adr.py`, `tests/test_adr.py`, `python cli.py adr-backtest` (`--holdout` once). Data: `stocks_data.load_5m_ext` (5m incl. premarket from 4:00, cache `data/research/*_5m_ext.parquet`).
+  - 1H swing bias, sweep of prev day / premarket level 9:30 to 11:00 that closes back inside, SMT (other ETF didn't sweep), displacement close past the last 5m swing, limit at the FVG edge (trade through to fill), stop past the sweep, target opposite liquidity at least 2R.
+  - Dev v1: 0 trades (session high as a target meant 2R never fit; `docs/adr_dev_v1.md`). v2 (17f93fa) dropped that target. **v2 dev FAILED: 6 trades in 7 years, 1 win, -0.5%** (`docs/adr_dev.md`). Too strict to trade; no v3. Holdout 2023+ never run, so it's still unseen.
+  - No Alpaca bars before 4 AM, so Asia/London levels aren't possible on ETFs (would need NQ/ES futures data; Andres said skip).
+- **Next:** a looser TJR spec drafted for review (own spec, locked before any run). Recheck Google billing in a couple weeks (2026-10-29: $0.08 usage, all covered by free trial savings).
 - **Local setup:** venv at `.venv` (Python 3.13). System Python is 3.9 with no deps. Local `.env` (gitignored) holds the Alpaca paper keys for stock data; never print or commit it.
 
 ## Commands
