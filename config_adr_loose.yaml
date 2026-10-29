@@ -1,0 +1,68 @@
+# ============================================================
+#  ADR LOOSE SPEC: LOOSER TJR STYLE MODEL ON QQQ + SPY 5m (research)
+#  Locked BEFORE any backtest. See docs/ADR_LOOSE_SPEC.md.
+#  Do not edit these numbers to make a backtest look better.
+#  The live daily crypto bot (config.yaml) is untouched by this file.
+# ============================================================
+
+universe:
+  symbols: ["QQQ", "SPY"]      # each is the other's SMT pair
+  timeframe: "5m"
+  session: { tz: "America/New_York", open: "09:30", close: "16:00" }
+  premarket: { start: "04:00", end: "09:30" }   # only for overnight high/low
+  data_source: "alpaca"
+  feed: "sip"
+  history_start: "2015-12-01"  # a month of warm up for 1H swings before dev
+
+periods:
+  dev_start: "2016-01-01"
+  dev_end: "2022-12-31"
+  holdout_start: "2023-01-01"  # the verdict, run ONCE, to the run date
+
+setup:
+  bias_tf: "1h"
+  swing_bars: 2                # each side, for both 1H and 5m swings
+  levels: ["prev_day", "premarket", "h1_swing"]   # h1_swing = most recent untouched confirmed 1H swing
+  sweep_window: { start: "09:30", end: "11:00" }   # sweep bar must start in here
+  require_smt: false           # logged per trade, diagnostic only
+  shift_within_bars: 12
+  displacement_min_body_pct: 50
+  min_target_r: 1.0            # nearest pool at least 1R away...
+  target_pick: "nearest_clearing_min"   # pick the nearest pool that is >= min_target_r (ADR: nearest pool, then check)
+  fallback_target_r: 2.0       # ...else a fixed 2R target
+  targets: ["prev_day", "premarket", "h1_swing"]
+
+trade:
+  entry: "fvg_edge"            # limit at the FVG edge nearest price
+  entry_valid_bars: 12
+  no_entries_after: "11:30"
+  fill_needs_trade_through: true
+  stop_offset: 0.01            # dollars beyond the sweep extreme
+  same_bar_stop_and_target: "stop"
+  flat_at_close: true
+  max_trades_per_symbol_per_day: 1
+  long_short: true
+
+risk:
+  risk_per_trade_pct: 1.0
+  max_position_pct_per_symbol: 50
+  daily_loss_limit_pct: 3.0
+  max_drawdown_kill_pct: 20    # recorded only
+
+costs:
+  fee_bps: 0
+  slippage_bps: 2
+  diagnostics:                 # NOT the verdict
+    stress: { fee_bps: 0, slippage_bps: 5 }
+    zero_cost: { fee_bps: 0, slippage_bps: 0 }
+
+passing_bar:                   # holdout only, all must hold, at real costs
+  min_sharpe: 0.5
+  min_profit_factor: 1.3
+  min_total_return_pct: 0.0
+  min_trades: 50
+  min_win_rate_edge_pts: 5     # above breakeven win rate for the trades taken
+  min_pct_quarters_profitable: 60
+
+account:
+  starting_equity: 100000
