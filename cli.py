@@ -17,6 +17,8 @@
   python cli.py adr-backtest            # ADR spec (TJR style) on QQQ + SPY 5m DEV check → docs/adr_dev.md
   python cli.py adr-backtest --holdout  # its one shot verdict → docs/adr_holdout.md
   python cli.py adr-backtest --loose    # ADR Loose spec DEV check → docs/adr_loose_dev.md (--holdout once)
+  python cli.py global-trend-backtest   # Global Trend (multi asset ETF trend) DEV check → docs/global_trend_dev.md
+  python cli.py global-trend-backtest --holdout  # its one shot verdict → docs/global_trend_holdout.md
 """
 from __future__ import annotations
 
@@ -239,6 +241,26 @@ def cmd_adr_backtest(args):
     return 0
 
 
+def cmd_global_trend_backtest(args):
+    """Global Trend, multi asset ETF trend following (docs/GLOBAL_TREND_SPEC.md). Dev by default; holdout once, ever."""
+    from bot import etf_data, global_trend
+    cfg = global_trend.load_config()
+    period = "holdout" if args.holdout else "dev"
+    out = ROOT / "docs" / f"global_trend_{period}.md"
+    if period == "holdout" and out.exists():
+        print(f"  refusing: the holdout already ran ({out}). It runs ONCE. See the spec.")
+        return 1
+    u = cfg["universe"]
+    bars = etf_data.load_yahoo(u["risk_assets"] + [u["cash_asset"]])
+    note = (f"Yahoo Finance daily bars, split + dividend adjusted (research copy in data/research), "
+            f"last bar {bars.index[-1]:%Y-%m-%d}. Data check vs Alpaca: see the spec change log.")
+    text = global_trend.report(cfg, bars, period, note)
+    print(text)
+    out.write_text(text)
+    print(f"\n  report → {out}")
+    return 0
+
+
 def _has_tabulate() -> bool:
     try:
         import tabulate  # noqa: F401
@@ -312,6 +334,9 @@ def main():
     ad.add_argument("--holdout", action="store_true", help="the one shot verdict on 2023+ data")
     ad.add_argument("--loose", action="store_true", help="the ADR Loose spec (docs/ADR_LOOSE_SPEC.md)")
     ad.set_defaults(fn=cmd_adr_backtest)
+    gtp = sub.add_parser("global-trend-backtest", help="Global Trend multi asset ETF trend: dev check, or --holdout once")
+    gtp.add_argument("--holdout", action="store_true", help="the one shot verdict on 2017+ data")
+    gtp.set_defaults(fn=cmd_global_trend_backtest)
     f = sub.add_parser("fetch"); f.set_defaults(fn=cmd_fetch)
     t = sub.add_parser("telegram", help="find chat id + send test message"); t.set_defaults(fn=cmd_telegram)
     al = sub.add_parser("alpaca", help="verify paper keys"); al.set_defaults(fn=cmd_alpaca)

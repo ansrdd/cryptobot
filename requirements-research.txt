@@ -1,0 +1,2 @@
+# Research only deps (not needed by the live bot or the server)
+yfinance==1.7.0

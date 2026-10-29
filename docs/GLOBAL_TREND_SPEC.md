@@ -84,4 +84,4 @@ Paper trade it on a separate Alpaca paper account, rebalanced monthly from the a
 
 ## Change log
 
-- (none yet)
+- 2026-10-29, data check, before any backtest (no strategy results seen). Yahoo vs Alpaca **daily bars**, 2016+: SPY (1.62% of days over 0.1%) and EEM (1.03%) failed the 1% limit; the other 7 passed. Cause: Alpaca's daily bar close sometimes picks up an after hours print instead of the 4:00 PM close (e.g. SPY 2020-08-31: Alpaca daily 321.34, last regular hours 5m bar 320.91, Yahoo 320.89). Rechecked SPY against Alpaca's **regular hours 5m closes** instead: 0.88% of 2,720 days over 0.1%, which passes. Yahoo matches the real session close better, so the backtest uses Yahoo as planned. The fault was in the reference, not the data.
