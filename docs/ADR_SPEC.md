@@ -33,7 +33,7 @@ All checks must pass. If any one fails, no trade.
 4. **SMT confirmation:** at the sweep bar, the other ETF (SPY for QQQ, QQQ for SPY) has **not** traded below the same kind of level (its own PDL or premarket low, whichever was swept) since 9:30. One swept, the other held = divergence. Both swept = no trade.
 5. **Structure shift with displacement:** within 12 bars (1 hour) after the sweep, a 5m bar **closes above** the last confirmed 5m swing high (2 bars each side) that formed before the sweep, and that bar's body is at least 50% of its range. If the sweep low breaks again first, the setup is dead.
 6. **Fair value gap:** among the bars from the sweep to the shift bar, the most recent bullish gap: bar i's low is above bar i minus 2's high. The FVG is that gap (bottom = high of i minus 2, top = low of i). No gap = no trade.
-7. **Room to target (the high probability check):** target = nearest buy side level above entry among: previous day high, premarket high, and the session high so far. If target is less than **2R** from entry, no trade.
+7. **Room to target (the high probability check):** target = nearest buy side level above entry among: previous day high and premarket high (v2: the session high so far is no longer a target). If target is less than **2R** from entry, no trade.
 
 ## Trade
 
@@ -98,3 +98,4 @@ Forward paper test on a separate Alpaca paper account for at least 3 months, sam
   - On the bar an order fills, only the stop can also hit; a target touch on that same bar is ignored (order inside the bar is unknown).
   - Share counts are whole shares (Alpaca can't short fractional shares). The 3% daily loss halt blocks new setups; an order already placed can still fill.
   - Alpaca SIP data starts 2016-01-04, so there is no warm up before dev. Bias is "none" (no trades) until the 1H chart has two swing highs and two swing lows.
+- 2026-10-29, **v2, after the dev check** (docs/adr_dev_v1.md: 0 trades in 2016 to 2022, so no result to fit to). The session high/low so far is dropped as a target. Why: after a sweep and a shift, the session extreme is almost always the swing that was just broken, sitting under 1R away, so the 2R check killed nearly every setup (2016: 22 of 23 setups with a gap failed it). The model targets the opposite **external** liquidity pool, which is the previous day and overnight (premarket) high/low. One change only; everything else, including the 2R minimum, stays. The 2023+ holdout is still unseen. If v2 fails its dev check, no v3 on this spec.

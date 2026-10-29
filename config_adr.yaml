@@ -28,7 +28,7 @@ setup:
   shift_within_bars: 12
   displacement_min_body_pct: 50
   min_target_r: 2.0
-  targets: ["prev_day", "premarket", "session_extreme"]
+  targets: ["prev_day", "premarket"]   # v2 (2026-10-29): session extreme dropped, see the spec change log
 
 trade:
   entry: "fvg_edge"            # limit at the FVG edge nearest price
